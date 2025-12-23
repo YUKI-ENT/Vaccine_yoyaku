@@ -1,0 +1,33 @@
+<%- include('./header.ejs', {Env: Env}); %>
+<body>
+    <%- include('./navbar.ejs', {Env: Env}); %>
+    
+
+<div id="container" class="container">
+		<nav aria-label="パンくずリスト">
+			<ol class="breadcrumb">
+				<li class="breadcrumb-item"><a href="<%= Env.https_path %>">ホーム</a></li>
+				<li class="breadcrumb-item">新規予約(人数選択)</li>
+				<li class="breadcrumb-item">日付選択</li>
+                <li class="breadcrumb-item active" aria-current="page">日付確認</li>
+			</ol>
+		</nav>
+	<div class="jumbotron">
+        <h2>予約手続きが完了しました。</h2>
+        <ul>
+            <li><a href="<%= Env.https_path %>?mode=reservechange&plan=<%=planid%>">予約一覧・変更ページ</a>で予約一覧をご確認下さい。</li>
+            <li class="text-danger">13歳未満の方で2回接種を希望される場合は、「新規予約」メニューから2回目の予約も続けて行ってください</li>
+        </ul>
+        <div id="navi" class="form-inline">
+            <a href="<%= Env.https_path %>?mode=reservenew&plan=<%=planid%>"  class="btn btn-primary m-2">新規予約</a>
+            <a href="<%= Env.https_path %>?mode=reservechange&plan=<%=planid%>"  class="btn btn-primary m-2">予約一覧・変更</a>
+            <a href="<%= Env.https_path %>?plan=<%=planid%>"  class="btn btn-info m-2">予約トップに戻る</a>
+        </div>
+    </div>  
+</div>
+<%- include('./footer.ejs'); %>
+
+</body>
+
+</html>
+

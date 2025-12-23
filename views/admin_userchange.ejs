@@ -1,0 +1,84 @@
+<%- include('./header.ejs', {Env: Env}); %>
+<body>
+    <%- include('./navbar-admin.ejs', {Env: Env,form:form}); %>
+    
+    <div id="container"  class="container">
+        <h2>ユーザー編集</h2>
+            <ul>
+                <% errors.forEach(function(error){ %>
+                    <li class="text-danger"><%=error%></li>
+                <% }); %>
+            </ul>
+            
+            <form action="<%=Env.admin%>" method="get">
+                <input type="hidden" name="mode" value="usercomplete" />
+                <input type="hidden" name="id" value="<%=plan%>" />
+                <table class="table"> 
+                    <tr><th>ユーザーID</th><td><input type="hidden" name="uid" value="<%=user.UID%>"/><%=user.UID%></td> </tr>
+                    <tr><th>家族ID</th><td><div class="form-inline"><input type="number" name="fid" value="<%=user.FID%>"  class="form-control">  <input type="checkbox" name="newfid" value="1" class="form-check-input"> <label class="form-check-label" for="newfid">新IDで登録</label></div>
+                    <% if(families.length > 0){ %>
+                    <% families.forEach(function(f){ %>
+                        ＜<a href="<%=Env.admin%>?mode=userchange&uid=<%=f.UID%>&id=<%=form.id%>"><%=f.name1%><%=f.name2%></a>＞
+                    <% }); %> 
+                    <% } %>
+                    </td></tr>
+                    <tr><th>診察券番号</th><td><input type="number" name="sid" value="<%=user.SID%>" size="5"  class="form-control"/></td></tr>
+                    <tr><th>誕生日</th><td><input type="date" name="birth" value="<%=user.birth%>" class="form-control"/></td></tr>  
+                    <tr><th>main</th><td><input type="number" name="main" value="<%=user.main%>" size="2" class="form-control"/></td></tr>
+                    <tr><th>姓</th><td><input type="text" name="name1" value="<%=user.name1%>" class="form-control"/></td></tr>
+                    <tr><th>名</th><td><input type="text" name="name2" value="<%=user.name2%>" class="form-control"/></td></tr>
+                    <tr><th>Email</th><td><input type="email" name="email" value="<%=user.email%>" class="form-control"/></td></tr>
+                </table>
+                <input type="submit" value="変更" class="btn btn-primary"/>
+                <input type="submit" name="del" value="削除" class="btn btn-danger" <% if(nores != 1){ %>disabled="disabled"<% }; %> />
+            </form>
+        
+        
+         <h3>このユーザーの予約一覧</h3>
+            <% ress.forEach(function(res){ %>
+                <table class="table">
+                    <tr>
+                        <th>患者名</th> <td><%=res.PT_name%>様 <%=res.PT_age%>歳</td>
+                    </tr>
+                    <tr>
+                        <th>予約日</th> 
+                        <td>
+                            <%=res.PT_date%> <%=res.zonename%>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>回数・量</th>
+                        <td><%=res.Vac_name%>回目：<%=res.Vac_volume%>ml</td>
+                    </tr>
+                    <tr>
+                        <th>キャンセル</th> 
+                        <td>
+                            <form action="<%=Env.admine%>" method="get">
+                                <input type="hidden" name="mode" value="changecomplete" />
+                                <input type="hidden" name="resid" value="<%=res.ID%>" />
+                                <input type="hidden" name="id" value="<%=form.id%>" />
+                                <input type="hidden" name="del" value="1" />
+                                <input type="submit" id="btndelres" value="予約を削除する" class="btn btn-danger"/>
+                            </form>
+                        </td>
+                    </tr>
+                </table>
+                <form action="<%=Env.admin%>" method="get">
+                    <input type="hidden" name="mode" value="pt" />
+                    <input type="hidden" name="id" value="<%=res.plan%>" />
+                    <input type="hidden" name="resid" value="<%=res.ID%>" />
+                    <input type="hidden" name="cal" value="1" />
+                    <input type="submit" value="予約日変更のためカレンダーを表示" class="btn btn-primary"/>
+                </form>
+            <% }); %>
+        
+        <div id="navi" class="form-group mt-3">
+            <a href="#" class="btn btn-info"  role="button" id="backbtn">戻る</a>
+        </div>
+    </div>
+<%- include('./footer.ejs'); %>
+<script type="text/javascript" src="/js/admin-c.js"></script>
+
+</body>
+
+</html>

@@ -1,0 +1,25 @@
+<%- include('./header.ejs', {Env: Env}); %>
+<body>
+    <%- include('./navbar-admin.ejs', {Env: Env,form:form}); %>
+    <div id="container"  class="container">
+        <ul>
+            <% errors.forEach(function(error){ %>
+                <li class="text-danger"><%=error %></li>
+            <% }); %>
+        </ul>
+        <h2>予約変更完了</h2>
+            <ul >
+                <li class="text-danger"><%=mes%></li>
+                <li><a href="<%=Env.admin%>?mode=sheet&amp;plan=<%=plan%>">予約一覧ページ</a>でご確認下さい。</li>
+            </ul>
+
+            <div id="navi" class="form-group mt-3">
+                <a href="<%=Env.admin%>?mode=cal&amp;plan=<%=plan%>" class="btn btn-info"  role="button" id="backbtn">トップに戻る</a>
+            </div>
+    </div>
+
+<%- include('./footer.ejs'); %>
+<script type="text/javascript" src="/js/admin-c.js"></script>
+        
+</body>
+</html>

@@ -1,0 +1,31 @@
+<%- include('./header.ejs', {Env: Env}); %>
+
+<body>
+<%- include('./navbar.ejs', {Env: Env}); %>
+
+
+<div id="container" class="container">
+		<nav aria-label="パンくずリスト">
+			<ol class="breadcrumb">
+				<li class="breadcrumb-item active" aria-current="page">ホーム</li>
+			</ol>
+		</nav>
+        <div id="container"  class="container">
+            <div class="jumbotron">
+                <h3><%= ptinfo.name1 + ptinfo.name2%>さん、ようこそ</h3>
+                <div id="plan">
+                    <div class="plan">
+                                    <ul>
+                                            <li class="text-danger">現在予約受付中の項目はありません。</li>
+                                    </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+</div>
+
+<%- include('./footer.ejs'); %>
+
+</body>
+
+</html>

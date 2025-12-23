@@ -1,0 +1,43 @@
+<%- include('./header.ejs', {Env: Env}); %>
+<body>
+    <%- include('./navbar.ejs', {Env: Env}); %>
+    <div id="container"  class="container">
+        <nav aria-label="パンくずリスト">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="<%= Env.https_path %>">ホーム</a></li>
+                <li class="breadcrumb-item"><a href="<%= Env.https_path %>?mode=familyedit">家族登録・削除</a></li>
+                <li class="breadcrumb-item active" aria-current="page">家族登録確認</li>
+            </ol>
+        </nav>
+        <div class="jumbotron">
+            <h3>ご家族の登録</h3>
+            <ul>
+                <li>お名前に間違いはございませんか？<br/>よろしければ<strong>登録ボタン</strong>を押してください。</li>
+            </ul>
+                    <dl>
+                        <dt>名前</dt>
+                        <dd><strong><%= form.name1 %>  <%= form.name2 %> 様</strong></dd>
+                        <dt>生年月日</dt>
+                        <dd><strong><%= form.fbirth %>生</strong>(<%= form.age %> 歳)</dd>
+                    </dl>
+                    <form action="<%= Env.https_path %>" method="get">
+                        <div class="form-inline">
+                            <input type="hidden" name="mode" value="familyadd" />
+                            <input type="hidden" name="fid" value="<%= form.fid %>" />
+                            <input type="hidden" name="name1" value="<%= form.name1 %>" />
+                            <input type="hidden" name="name2" value="<%= form.name2 %>" />
+                            <input type="hidden" name="Karte" value="<%= form.Karte %>" />
+                            <input type="hidden" name="fbirth" value="<%= form.fbirth %>" />
+                            <input type="submit" value="登録する"  class="btn btn-primary mt-3"/>
+                        </div>
+                        <div class="form-group">
+                            <a href="#" class="btn btn-info mt-3"  role="button" id="backbtn">戻る</a>
+                        </div>
+                    </form>
+        </div>
+    </div>
+<%- include('./footer.ejs'); %>
+
+</body>
+
+</html>

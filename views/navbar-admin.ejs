@@ -1,0 +1,43 @@
+<nav class="navbar navbar-expand-md navbar-dark bg-dark mb-4">
+    <a class="navbar-brand" href="<%= Env.admin %><% if(form.id){ %>?id=<%=form.id%><% } %>">管理メニュー</a>
+    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarCollapse">
+      <ul class="nav navbar-nav mr-auto">
+      </ul>
+      <ul class="nav navbar-nav">
+        <li class="nav-item">
+          <a class="nav-link" href="<%= Env.admin %>?mode=cal<% if(form.id){ %>&amp;id=<%=form.id%><% } %>">カレンダー</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="<%= Env.admin %>?mode=sheet<% if(form.id){ %>&amp;id=<%=form.id%><% } %>">予約一覧</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="<%= Env.admin %>?mode=plan<% if(form.id){ %>&amp;id=<%=form.id%><% } %>">表示プラン管理</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="<%= Env.admin %>?mode=waku<% if(form.id){ %>&amp;id=<%=form.id%><% } %>">枠管理</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="<%= Env.admin %>?mode=user<% if(form.id){ %>&amp;id=<%=form.id%><% } %>">ユーザー管理</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="<%= Env.admin %>?mode=zanryo<% if(form.id){ %>&amp;id=<%=form.id%><% } %>">残量管理</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="<%= Env.admin %>?mode=mail<% if(form.id){ %>&amp;id=<%=form.id%><% } %>">メール</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="<%= Env.admin %>?mode=settings<% if(form.id){ %>&amp;id=<%=form.id%><% } %>">システム設定</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="<%= Env.admin %>?mode=log<% if(form.id){ %>&amp;id=<%=form.id%><% } %>">ログ</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="<%= Env.admin %>?mode=logout">ログアウト</a>
+        </li>
+      </ul>
+    </div>
+</nav>
+  

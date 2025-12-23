@@ -1,0 +1,28 @@
+<%- include('./header.ejs', {Env: Env}); %>
+<body>
+    <%- include('./navbar.ejs', {Env: Env}); %>
+    
+    <div id="container" class="container">
+        <nav aria-label="パンくずリスト">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="<%= Env.https_path %>">ホーム</a></li>
+                <li class="breadcrumb-item">メール登録</li>
+                <li class="breadcrumb-item">仮登録メール送信</li>
+                <li class="breadcrumb-item active" aria-current="page">メール登録完了</li>
+            </ol>
+        </nav>
+        <div class="jumbotron">
+            <h2>メール登録が完了しました</h2>
+                <div>
+                    <%=form.email%>を登録しました。
+                </div>
+            <div id="navi" class="form-group">
+                <a href="<%= Env.https_path %>" class="btn btn-info mt-3"  role="button" id="backbtn">トップに戻る</a></li>
+            </div>
+        </div>
+    </div>
+    <%- include('./footer.ejs'); %>
+
+</body>
+
+</html>

@@ -1,0 +1,86 @@
+<%- include('./header.ejs', {Env: Env}); %>
+<body>
+    <%- include('./navbar-admin.ejs', {Env: Env,form:form}); %>
+    <div id="container"  class="container">
+        <ul>
+            <% errors.forEach(function(error){ %>
+                <li class="text-danger"><%=error %></li>
+            <% }); %>
+        </ul>
+        <form action="<%= Env.admin %>" method="get">
+            <input type="hidden" name="mode" value="new" />
+                <dl>
+                    <dt>年度情報</dt>
+                    <dd>
+                        <select name="id" id="select_year" class="form-control" >
+                            <% plans.forEach(function(p){ %>
+                                <option value="<%=p.id%>" <% if(p.id == plan){ %> selected="selected" <% } %> ><%= p.year %>年度</option>
+                            <% }); %>
+                        </select>
+                    </dd>
+                </dl>
+        </form>
+
+	    <h2>新規予約</h2>
+            <h3><%=res.year%>年<%=res.month%>月<%=res.day%>日 <%=res.zonename%>の予約を行います</h3>
+                <form action="<%=Env.admin%>" method="get">
+                    <input type="hidden" name="mode" value="new" />
+                    <input type="hidden" name="year" value="<%=res.year%>" />
+                    <input type="hidden" name="month" value="<%=res.month%>" />
+                    <input type="hidden" name="day" value="<%=res.day%>" />
+                    <input type="hidden" name="zoneid" value="<%=res.zoneid%>" />
+                    <input type="hidden" name="zonename" value="<%=res.zonename%>" />
+                    <input type="hidden" name="plan" value="<%=res.plan%>" />
+                    <select name="num"  id="selnum" class="form-control">
+                        <% for(let i=1;i<=8;i++){ %>}
+                        <option value="<%=i%>" <% if (res.num == i){ %> selected <% } %> ><%=i%>人</option>
+                        <% } %>
+                    </select>
+                </form>
+        
+            <form action="<%=Env.admin%>" method="get">
+                <div class="row"><input type="checkbox" name="family" class="form-check-input" value="1">同一家族として登録する</input></div>
+                <input type="hidden" name="mode" value="newconf" />
+                <input type="hidden" name="year" value="<%=res.year%>" />
+                <input type="hidden" name="month" value="<%=res.month%>" />
+                <input type="hidden" name="day" value="<%=res.day%>" />
+                <input type="hidden" name="zoneid" value="<%=res.zoneid%>" />
+                <input type="hidden" name="zonename" value="<%=res.zonename%>" />
+                <input type="hidden" name="plan" value="<%=res.plan%>" />
+                <input type="hidden" name="num" value="<%=res.num%>" />
+            
+                <% for(let i=1;i<=res.num;i++) { %>
+                    <div class="jumbotron">
+                        <div class="row">
+                            <label for="Karte[]">診察券番号</label>
+                            <input type="number" name="Karte[]"  value="<%=form.Karte%>" class="form-control"/>
+                        </div>
+                        
+                        <button type="button" id="btnnokarte" class="btn-info btn-sm" >初診</button>
+                        <div id="newpt">
+                            <div class="row">
+                                <label for="birth">生年月日</label>
+                                <input type="date" name="birth[]" class="form-control" value=<%=form.birth%>/>
+                            </div>
+                            <div class="row">
+                                <label for="dname1">姓</label>
+                                <input type='text' name='dname1[]' value='<%=res.name1%>' class="form-control"/>
+                                <label for="dname2">名</label>
+                                <input type='text' name='dname2[]' value='<%=res.name2%>' class="form-control"/>
+                            </div>
+                        </div>
+                    </div>
+                <% } %>
+                
+                <input type="submit" value="予約確認へ" class="btn btn-primary"/>
+            </form>
+            <div id="navi" class="form-group mt-3">
+                <a href="#" class="btn btn-info"  role="button" id="backbtn">戻る</a>
+            </div>
+    </div>
+
+<%- include('./footer.ejs'); %>
+<script type="text/javascript" src="/js/admin-c.js"></script>
+        
+</body>
+</html>

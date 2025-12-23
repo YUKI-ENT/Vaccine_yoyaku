@@ -1,0 +1,56 @@
+<%- include('./header.ejs', {Env: Env}); %>
+<body>
+    <%- include('./navbar-admin.ejs', {Env: Env,form:form}); %>
+    
+    <div id="container"  class="container">
+        
+        
+        <h2>ワクチン残量管理</h2>
+        <ul>
+            <% errors.forEach(function(error){ %>
+                <li class="attention"><%=error%></li>
+            <% }); %>
+        </ul>
+        
+        <h3>現在の必要数・接種済数</h3>
+        <table class="table">
+            <tr>
+                <th></th><th>総数</th><th>0.5シリンジ</th><th>0.25シリンジ</th>
+            </tr>
+            <tr>
+                <th>今年度必要数</th><td><%=vials.total%>バイアル</td><td><%=vials.total5%>本</td><td><%=vials.total25%>本</td>
+            </tr>
+            <tr>
+                <th>接種済数</th><td><%=vials.sumi%>バイアル</td><td><%=vials.sumi5%>本</td><td><%=vials.sumi25%>本</td>
+            </tr>
+            <tr>
+                <th>指定日までの必要数</th>
+                <td>
+                    <form action="<%=Env.admin%>" method="GET">
+                        <input type="hidden" name="mode" value="zanryo" />
+                        <input type="hidden" name="id" value="<%=plan%>" />
+                        <select name="days" id="select_days" class="form-control">
+                            <option value="7" <% if(days === 7){ %> selected <% } %>>7日後</option>
+                            <option value="14" <% if(days === 14){ %> selected <% } %>>14日後</option>
+                            <option value="28" <% if(days === 28){ %> selected <% } %>>28日後</option>
+                        </select>
+                    </form>
+                    <%=vials.pos%>バイアル
+                </td>
+                <td><%=vials.pos5%>本</td> <td><%=vials.pos25%>本</td>
+            </tr>
+            
+        </table>
+        
+        
+        
+        <div id="navi" class="form-group mt-3">
+            <a href="#" class="btn btn-info"  role="button" id="backbtn">戻る</a>
+        </div>
+    </div>
+<%- include('./footer.ejs'); %>
+<script type="text/javascript" src="/js/admin-c.js"></script>
+
+</body>
+
+</html>

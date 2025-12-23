@@ -1,0 +1,44 @@
+<%- include('./header.ejs', {Env: Env}); %>
+<body>
+    <%- include('./navbar-admin.ejs', {Env: Env,form:form}); %>
+    
+    <div id="container"  class="container">
+        
+        <h2>メール送信完了</h2>
+            <ul>
+                <% errors.forEach(function(error){ %>
+                    <li class="attention"><%=error%></li>
+                <% }); %>
+            </ul>
+            <h3>送信完了</h3>
+                <div>
+                    Title: <%= form.mailtitle %>
+                </div>
+                <div>
+                    Content: <%= form.content %>
+                </div>
+                <table class="table table-striped">
+                    <tr>
+                        <th>UID</th>
+                        <th>name</th>
+                        <th>address</th>
+                    </tr>
+                    <% users.forEach(function(user){ %>
+                        <tr>
+                            <td><%=user.UID%></td>
+                            <td><%=user.name1%> <%=user.name2%></td>
+                            <td><%=user.email%></td>
+                        </tr>
+                    <% }); %>
+                </table>
+        
+        <div id="navi" class="form-group mt-3">
+            <a href="#" class="btn btn-info"  role="button" id="backbtn">戻る</a>
+        </div>
+    </div>
+<%- include('./footer.ejs'); %>
+<script type="text/javascript" src="/js/admin-c.js"></script>
+
+</body>
+
+</html>

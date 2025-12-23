@@ -1,0 +1,424 @@
+@charset "utf-8";
+
+/********* HTMLリセット *********************************************/
+
+body, div, h1, h2, h3, h4, h5, h6, p, ul, ol, li, dl, dt, dd, pre, blockquote, th, td, form, fieldset, input, textarea {
+	margin: 0;
+	padding: 0;
+}
+h1, h2, h3, h4, h5, h6 {
+	font-size: 100%;
+	font-weight: normal;
+}
+em, strong, code, address, th {
+	font-weight: normal;
+	font-style: normal;
+}
+ul, ol {
+	list-style: none;
+}
+q:before, q:after {
+	content: "";
+}
+abbr, acronym {
+	border: 0;
+}
+table {
+	border-collapse: collapse;
+	border-spacing: 0;
+}
+th {
+	text-align: left;
+}
+fieldset, img {
+	border: 0;
+}
+
+/********* HTML再定義 ***********************************************/
+
+body {
+	line-height: 1.4;
+	margin: 0 auto;
+	padding: 10px;
+	background-color: #EEEEEE;
+	color: #000000;
+	font-size: 80%;
+	font-family: "ヒラギノ角ゴ Pro W3", "Hiragino Kaku Gothic Pro", "メイリオ", Meiryo, "ＭＳ Ｐゴシック", sans-serif;
+}
+
+h1 {
+	line-height: 1.0;
+	font-size: 200%;
+	font-weight: bold;
+}
+h2 {
+	margin: 10px 0;
+	padding: 5px 0;
+	border-top: 1px solid #AAAAAA;
+	border-bottom: 1px solid #AAAAAA;
+	font-weight: bold;
+}
+h3 {
+	font-weight: bold;
+}
+h4, h5, h6 {
+	margin: 10px 0;
+	font-weight: bold;
+}
+
+p {
+	margin: 10px 0;
+}
+em, strong {
+	font-style: normal;
+	font-weight: bold;
+}
+ul {
+	margin: 10px 20px;
+}
+ul li {
+	list-style: disc;
+}
+ol {
+	margin: 10px 30px;
+}
+ol li {
+	list-style: decimal;
+}
+dl {
+	margin: 10px 0;
+}
+dl dd {
+	margin-left: 30px;
+}
+pre {
+	overflow: auto;
+	margin: 10px 0;
+	padding: 10px;
+	border: 1px solid #DDDDDD;
+}
+code {
+	color: #000080;
+}
+pre, code {
+	line-height: 1.2;
+	font-size: 100%;
+	font-family: "ＭＳ ゴシック", monospace;
+}
+blockquote {
+	overflow: auto;
+	margin: 10px 0;
+	padding: 0 15px;
+	border-left: 2px solid #7777AA;
+}
+blockquote div, blockquote p, blockquote li, blockquote dt, blockquote dd {
+	color: #777777;
+}
+address {
+	padding-top: 10px;
+	border-top: 1px solid #999999;
+}
+
+table {
+	margin: 15px 0;
+	border: 1px solid #666666;
+}
+table tr th {
+	padding: 5px;
+	border: 1px solid #AAAAAA;
+	background-color: #EEEEEE;
+	font-weight: bold;
+	text-align: center;
+}
+table tr td {
+	padding: 5px;
+	border: 1px solid #AAAAAA;
+}
+table tr td.lack {
+	background-color: #ff0000;
+}
+table tr td input {
+	margin: -2px 0;
+}
+
+form legend {
+	display: none;
+}
+form input, form textarea {
+	padding: 1px;
+}
+form dl dt {
+	float: left;
+	clear: left;
+	width: 10em;
+}
+form ul {
+	margin: 15px 0;
+}
+form ul li {
+	list-style: none;
+}
+form p input {
+	padding: 2px;
+}
+img {
+	vertical-align: middle;
+	margin: auto 1px;
+}
+
+a:link, a:visited {
+	color: #0000CC;
+	text-decoration: underline;
+}
+a:active, a:hover {
+	color: #FF7700;
+	text-decoration: underline;
+}
+
+/********* 基本構造 *************************************************/
+
+div#container {
+	width: 550px;
+	margin: 0 auto;
+	padding: 20px;
+	border: 1px solid #666666;
+	background-color: #FFFFFF;
+}
+div#menu {
+	border-top: 1px solid #999999;
+	border-bottom: 1px solid #999999;
+}
+div#customer {
+	margin-bottom: 20px;
+}
+div#work {
+	margin-bottom: 20px;
+}
+div#admin {
+	width: 950px;
+	margin: 0 auto;
+	padding: 20px;
+	border: 1px solid #666666;
+	background-color: #FFFFFF;
+}
+div#print {
+	width: 600px;
+	margin: 0 auto;
+	padding: 20px;
+	background-color: #FFFFFF;
+        font-size: 120%;
+}
+
+/********* メニュー *************************************************/
+
+div#menu h2 {
+	display: none;
+}
+div#menu ul {
+	margin: 5px 0;
+}
+div#menu ul li {
+	display: inline;
+	list-style: none;
+	margin-right: 10px;
+}
+
+/********* 施設一覧 *************************************************/
+
+div#plan h2 {
+	display: none;
+}
+div#plan h3 {
+	font-size: 150%;
+}
+div#plan div.plan {
+	margin: 15px 0;
+	padding: 10px;
+	border: 1px solid #AAAAAA;
+}
+
+div#plan dl {
+	padding: 10px;
+	border: 1px solid #DDDDDD;
+	background-color: #FFFFFF;
+}
+div#plan dl dt {
+	float: left;
+	clear: left;
+	width: 6em;
+}
+
+/********* ページ移動 ***********************************************/
+
+div#page h2 {
+	display: none;
+}
+div#page ul {
+	margin: 5px 0;
+}
+div#page ul li {
+	display: inline;
+	margin-right: 10px;
+}
+
+/********* ナビゲーション *******************************************/
+
+div#navi h2 {
+	display: none;
+}
+div#navi ul {
+	margin: 5px 0;
+	text-align: right;
+}
+div#navi ul li {
+	display: inline;
+	margin-left: 5px;
+}
+
+/********* 顧客情報 *************************************************/
+
+div#customer dl dt {
+	float: left;
+	clear: left;
+	width: 6em;
+}
+
+/********* 処理選択 *************************************************/
+
+div#work form {
+	margin: 10px 0;
+}
+div#work form dl dt {
+	display: none;
+}
+div#work form dl dd {
+	margin: 0;
+}
+
+/********* 設定編集 *************************************************/
+
+div#config form div.data {
+	margin-bottom: 20px;
+}
+div#config form div.data h3 {
+	margin: 20px 0 15px 0;
+	padding: 3px;
+	background-color: #EEEEEE;
+}
+div#config form div.data p.comment {
+	margin: 0 3px 3px 3px;
+}
+div#config form div.data p.config {
+	margin: 0 3px 10px 3px;
+}
+
+/********* 個別指定 *************************************************/
+
+.attention {
+	color: #FF0000;
+	font-weight: bold;
+}
+.number {
+	text-align: right;
+}
+
+ul.apply {
+	margin: 15px 0 10px 0;
+}
+ul.apply li {
+	display: inline;
+	list-style: none;
+	padding: 7px;
+	border: 1px solid #0000CC;
+	background-color: #EEEEEE;
+	font-weight: bold;
+}
+
+table.calender tr td {
+	width: 65px;
+	height: 65px;
+	vertical-align: top;
+}
+table.calender tr td input {
+	margin-top: 2px;
+}
+table.calender tr td.available {
+	background-color: #EEFFEE;
+}
+table.calender tr td.past {
+	background-color: #C9E2F8;
+}
+table.calender tr td span.day {
+	color: #222222;
+}
+table.calender tr td span.satday {
+	color: #2222CC;
+}
+table.calender tr td span.sunday {
+	color: #CC2222;
+}
+
+table.apply tr td {
+	text-align: center;
+}
+table.change tr td {
+	width: 60px;
+	height: 60px;
+	vertical-align: top;
+        background-color: #ffffcc;
+}
+table.change tr td.past {
+	background-color: #C9E2F8;
+}
+table.change tr td input {
+	margin-top: 2px;
+}
+table.change tr td.available {
+	background-color: #EEFFEE;
+}
+table.change tr td span.day {
+	color: #222222;
+}
+table.change tr td span.satday {
+	color: #2222CC;
+}
+table.change tr td span.sunday {
+	color: #CC2222;
+}
+tr.color1 {
+        background-color: #C9E2F8; 
+} 
+tr.color_yellow {
+        background-color: #ffffc0; 
+} 
+table.right{
+        margin: 20px 0 0 400px;
+
+}
+table.left{
+        float: left;
+}
+table.reserve{
+    margin-left: auto;
+    margin-right: auto;
+    font-size: 150%;
+}
+
+/********* IE6用設定 ************************************************/
+
+* html body {
+	text-align: center;
+}
+* html body div#container {
+	width: 590px;
+	text-align: left;
+}
+* html body pre {
+	width: 100%;
+}
+* html body table tr th, * html body table tr td {
+	font-size: 80%;
+}
+div.pageblock {
+   page-break-before:  always;
+}

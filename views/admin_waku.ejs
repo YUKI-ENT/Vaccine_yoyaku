@@ -1,0 +1,112 @@
+<%- include('./header.ejs', {Env: Env}); %>
+<body>
+    <%- include('./navbar-admin.ejs', {Env: Env,form:form}); %>
+    <div id="container"  class="container">
+        <ul>
+            <% errors.forEach(function(error){ %>
+                <li class="text-danger"><%=error %></li>
+            <% }); %>
+        </ul>
+        <form action="<%= Env.admin %>" method="get">
+            <input type="hidden" name="mode" value="waku" />
+                <dl>
+                    <dt>年度情報</dt>
+                    <dd>
+                        <select name="id" id="select_year" class="form-control" >
+                            <% plans.forEach(function(p){ %>
+                                <option value="<%=p.id%>" <% if(p.id == plan){ %> selected="selected" <% } %> ><%= p.year %>年度</option>
+                            <% }); %>
+                        </select>
+                    </dd>
+                </dl>
+        </form>
+        
+    <h2>時間帯管理</h2>
+        <table class="table table-responsive-sm">
+            <% zones.forEach(function(zone){ %>
+                <tr><form  class="form-inline" action="<%= Env.admin %>" method="get">
+                    <input type="hidden" name="mode" value="waku" />
+                    <input type="hidden" name="work" value="zoneedit" />
+                    <input type="hidden" name="id" value="<%=form.id%>" />
+                    <th>ID</th>
+                    <td><input type="hidden" name="zoneid" value="<%=zone.id%>" /><%=zone.id%></td> 
+                    <th>Name</th>
+                    <td><input type="text" name="zonename" class="form-control" value="<%=zone.name%>"></td>
+                    <td><input type="submit" name="zoneedit" class="btn btn-primary btn-sm" value="変更"></td>
+                    <td><input type="submit" name="zonedel" class="btn btn-sm btn-danger" value="削除"></td>
+                </form></tr>
+            <% }); %>
+            <tr>
+            <form action="<%= Env.admin %>" method="get" class="form-inline" >
+                <input type="hidden" name="mode" value="waku" />
+                <input type="hidden" name="work" value="zoneadd" />
+                <input type="hidden" name="id" value="<%=form.id%>" />
+                <td colspan="3"></td>
+                <td><input type="text" name="zonename" class="form-control" ></td>
+                <td colspan="2"><input type="submit" id="btnaddzone" value="追加" class="btn btn-sm btn-primary"></td>
+            </form>
+            </tr>
+        </table>
+        
+    <h2>予約枠管理</h2>
+        <form action="<%= Env.admin %>" method="get">
+            <input type="hidden" name="mode" value="waku" />
+            <input type="hidden" name="work" value="change" />
+            <input type="hidden" name="id" value="<%=form.id%>" />
+
+            <table class="table table-responsive-sm">
+                <tr><th>開始日</th> 
+                    <td>
+                        <input type="date" name="datestart" class="form-group" value="<%=activeplan.start%>" />
+                    </td>
+                    <th>終了日</th>
+                    <td>
+                        <input type="date" name="dateend" class="form-group" value="<%=activeplan.end%>" />
+                    </td>
+                </tr>
+            </table>
+            <table class="table table-responsive-sm" id="tblzone">
+                <tr><th class="col-1">時間帯</th>
+                    <th><input type="checkbox" name="wds[]" value="1" class="form-check-input" id="chk1"/>月</th>
+                    <th><input type="checkbox" name="wds[]" value="2" class="form-check-input" id="chk2" />火</th> 
+                    <th><input type="checkbox" name="wds[]" value="3" class="form-check-input" id="chk3" />水</th>
+                    <th><input type="checkbox" name="wds[]" value="4" class="form-check-input" id="chk4" />木</th> 
+                    <th><input type="checkbox" name="wds[]" value="5" class="form-check-input" id="chk5" />金</th> 
+                    <th><input type="checkbox" name="wds[]" value="6" class="form-check-input" id="chk6" />土</th> 
+                </tr>
+                <% zones.forEach(function(zone){ %>
+                    <tr><th><%=zone.name%><input type="hidden" name="zoneids[]" value="<%=zone.id%>"</th> 
+                        <% for(var i=1;i<=6;i++){ %>
+                            <td><input type="number" min=0  step=1 name="num[<%=zone.id%>][<%=i%>]" class="form-control" id="num<%=i%>"  disabled></td>
+                        <% } %>
+                    </tr>
+                <% }); %>
+                <tr><td  colspan="5"></td>
+                    <td colspan="2">
+                        <input type="reset" value="元に戻す" class="btn btn-info"/>
+                        <input type="submit" value="枠設定" class="btn btn-primary"/>
+                    </td>
+                </tr>
+            </table>
+            
+        </form>
+            
+        <h2>枠一覧</h2>
+        <div class="justify-content-end">
+            <a href="<%=Env.admin%>?mode=waku&amp;work=delwaku&amp;id=<%=plan%>" role="button" id="btndel" class="btn btn-sm btn-danger">全削除</a>
+        </div>
+        <table class="table table-responsive-sm">
+            <tr><th>日</th><th>ZONE</th><th>枠数</th><th>PlanID</th><th>削除</th></tr>
+            <% waku.forEach(function(w){ %>
+                <tr>
+                    <td><%=w.Sch_date%></td><td><%=w.zonename%></td><td><%=w.Sch_Num%></td><td><%=w.plan%></td>
+                    <td> <a href="<%=Env.admin%>?mode=waku&amp;work=delday&amp;id=<%=plan%>&amp;wakuid=<%=w.ID%>" role="button" id="btndelday" class="btn btn-sm btn-danger">削除</a></td>
+                </tr>
+            <% }); %>
+        </table>
+    </div>
+<%- include('./footer.ejs'); %>
+    <script type="text/javascript" src="/js/admin-c.js"></script>
+    
+</body>
+</html>

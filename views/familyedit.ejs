@@ -1,0 +1,70 @@
+<%- include('./header.ejs', {Env: Env}); %>
+<body>
+    <%- include('./navbar.ejs', {Env: Env}); %>
+    
+    <div id="container" class="container">
+        <nav aria-label="パンくずリスト">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="<%= Env.https_path %>">ホーム</a></li>
+                <li class="breadcrumb-item active" aria-current="page">家族登録・削除</li>
+            </ol>
+        </nav>
+        <div class="jumbotron">
+            <h2>登録済みのご家族一覧・削除</h2>
+                登録した家族を削除する場合は、削除したい人にチェックを入れ、下の削除ボタンを押して下さい。<br/>
+                <form action="<%= Env.https_path %>" method="get">
+                    <div class="form-group">
+                        <ul>
+                             <li><%= ptinfo.name1 + ' ' + ptinfo.name2 %>様(ご本人は削除できません)</li>
+                             <% family.forEach(function (f, key) { %>
+                             <li><input type="checkbox" class="form-check-input" name="deluid[]" id="deluid[]" value="<%= f.UID %>"><label class="form-check-label" for="deluid[]"><%= f.name1 %> <%= f.name2 %>様(<%= f.birth %>生)</label></li>
+                             <% }); %>
+                        </ul>
+                        <input type="hidden" name="mode" value="familydelconf" />
+                        <button type="submit" class="btn btn-primary" value="削除" >削除</button>
+                     </div>
+                </form> 
+    
+        <h2>家族の追加</h2>
+        <ul>
+                    <li>当院を受診されたことがある方は、<strong>診察券番号</strong>と<strong>生年月日</strong>を入力してください。</li>
+                    <li>当院初診の方は、<strong>氏名（カタカナフリガナで）</strong>と<strong>生年月日</strong>を入力してください。</li>
+                    <% errors.forEach(function (value, key) { %>
+                        <li class="text-danger"><%= value %></li>
+                    <% }); %>
+            
+        </ul>
+        <form action="<%= Env.https_path %>" method="get">
+            <div class="form-group">
+                <dt>生年月日(西暦)<abbr class="attention" title="入力必須">*</abbr></dt>
+                    <div class="form-inline"> 
+                        <input type="text"  id="fbirth" name="fbirth" placeholder="年/月/日" class="form-control"/>
+			        </div>
+                    
+                    <div class="form-group">
+                        <label for="Karte"><dt>診察券番号(お持ちの方のみ)</dt></label>
+                        <input type="number" name="Karte" size=10 mode="numeric" ISTYLE="4" class="form-control" id="Karte" />
+                    </div>
+                    <label ><dt>[お名前](カタカナ):初診の方のみ</dt></label>
+                    <div class="form-inline">
+                        <label for="name1">セイ</label>
+                        <input type='text' name='name1' id="name1" value='' size='14' maxlength='10' class="form-control"/>
+                        <label for="name2">メイ</label>
+                        <input type='text' name='name2' id="name2" value='' size='14' maxlength='10' class="form-control"/>
+                    </div>
+                    <div class="form-group mt-3">
+                        <input type="hidden" name="mode" value="familyaddconf" />
+                        <button type="submit" value="確認画面へ進む" class="btn btn-primary">追加</button>
+                    </div>
+            </div>
+        </form>
+            <div id="navi" class="form-group">
+                <a href="#" class="btn btn-info"  role="button" id="backbtn">戻る</a></li>
+            </div>
+        </div>
+    </div>
+    <%- include('./footer.ejs'); %>
+
+</body>
+
+</html>

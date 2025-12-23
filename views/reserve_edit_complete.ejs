@@ -1,0 +1,35 @@
+<%- include('./header.ejs', {Env: Env}); %>
+<body>
+    <%- include('./navbar.ejs', {Env: Env}); %>
+    
+
+<div id="container" class="container">
+		<nav aria-label="パンくずリスト">
+			<ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="<%= Env.https_path %>">ホーム</a></li>
+                <li class="breadcrumb-item">予約の確認・変更・キャンセル</li>
+                <li class="breadcrumb-item">予約日変更(日付選択)</li>
+				<li class="breadcrumb-item">予約日変更確認</li>
+                <li class="breadcrumb-item active" aria-current="page">予約日変更完了</li>
+			</ol>
+		</nav>
+	<div class="jumbotron">
+        <h2>予約変更手続きが完了しました。</h2>
+        <ul>
+            <% errors.forEach((e)=>{ %>
+                <li class="text-danger"><%=e%></li>
+            <% }); %>
+                <li><a href="<%= Env.https_path %>?mode=reservechange&plan=<%=planid%>">予約一覧・変更ページ</a>で予約一覧をご確認下さい。</li>
+        </ul>
+        <div id="navi" class="form-inline">
+            <a href="<%= Env.https_path %>?mode=reservechange&plan=<%=planid%>"  class="btn btn-primary m-2">予約一覧・変更</a>
+            <a href="<%= Env.https_path %>?plan=<%=planid%>"  class="btn btn-info m-2">予約トップに戻る</a>
+        </div>
+    </div>  
+</div>
+<%- include('./footer.ejs'); %>
+
+</body>
+
+</html>
+

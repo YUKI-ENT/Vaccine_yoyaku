@@ -1,0 +1,62 @@
+<%- include('./header.ejs', {Env: Env}); %>
+<body>
+    <%- include('./navbar.ejs', {Env: Env}); %>
+    
+
+<div id="container" class="container">
+		<nav aria-label="パンくずリスト">
+			<ol class="breadcrumb">
+				<li class="breadcrumb-item"><a href="<%= Env.https_path %>">ホーム</a></li>
+				<li class="breadcrumb-item">新規予約(人数選択)</li>
+				<li class="breadcrumb-item">日付選択</li>
+                <li class="breadcrumb-item active" aria-current="page">日付確認</li>
+			</ol>
+		</nav>
+	<div class="jumbotron">
+        <h2>予約の確認</h2>
+        <div class="text-danger">まだ予約は確定していません。下記に間違いがなければ、確定のボタンを押してください。</div>
+        
+        <table class="table table-border">
+            <tr>
+                <th>日付</th><td><strong><%=res.year%>年<%=res.month%>月<%=res.day%>日(<%=res.youbi%>)</strong></td>
+            </tr>
+            <tr>
+                <th>時間帯</th><td><strong><%=res.zonename%></strong></td>
+            </tr>
+            <tr>
+                <th>人数</th>
+                <td><strong><%=res.num%></strong>人<br/>
+                    <ol>
+                        <% families.forEach(function(family){ %>
+                            <li><%=family.name1 + family.name2%>様(<%=family.birth%>生)</li>
+                        <% }); %>
+                    </ol>     
+                </td>
+            </tr>
+            <tr>
+                <th>変更・キャンセル</th>
+                <td><% if(plan.cancel) { %>接種日の<%=plan.cancel%>時間前まで受付<% } else { %>キャンセル時は診療時間帯にお電話ください<% } %></td>
+            </tr>
+        </table>
+        <div class="form-group">
+            <form action="<%= Env.https_path %>" method="get">
+                <input type="hidden" name="mode" value="reservenewcomplete" />
+                <input type="hidden" name="token" value="<%=token%>" />
+                <input type="hidden" name="data" value="<%=data%>" />
+                
+                <div class="form-group"><input type="submit" value="上記の内容で予約を確定する" class="btn btn-primary"/></div>
+            </form>
+        </div>
+
+    </div>
+    <div id="navi" class="form-group">
+        <%# <a href="= Env.https_path ?mode=reservenew&amp;plan= form.plan " class="btn btn-info m-1"  role="button" id="backbtn">戻る</a> %>
+        <a href="#" class="btn btn-info m-1"  role="button" id="backbtn">戻る</a>
+    </div>
+</div>
+<%- include('./footer.ejs'); %>
+
+</body>
+
+</html>
+

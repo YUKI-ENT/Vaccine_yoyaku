@@ -1,0 +1,47 @@
+<%- include('./header.ejs', {Env: Env}); %>
+<body>
+    <%- include('./navbar-admin.ejs', {Env: Env,form:form}); %>
+    <div id="container"  class="container">
+        <ul>
+            <% errors.forEach(function(error){ %>
+                <li class="text-danger"><%=error %></li>
+            <% }); %>
+        </ul>
+                
+	    <h2>Log一覧</h2>
+            <div class="btn-group" role="group" aria-label="range group">
+                <% range = (!form.range) ? 1: form.range; %>
+                <% for(let i=1;i<=10;i++){ %>
+                    <% if(range == i){ %>
+                        <a href="<%=Env.admin%>?mode=log&range=<%=i%>&id=<%=form.id%>" role="button" class="btn-light btn"><%=i%></a>
+                    <% } else { %>
+                        <a href="<%=Env.admin%>?mode=log&range=<%=i%>&id=<%=form.id%>" role="button" class="btn-secondary btn"><%=i%></a>
+                    <% } %>
+                <% } %>
+            </div>
+            <table class="table table-responsive-sm">
+                <tr class="thead-light">
+                    <th>日時</th>
+                    <th>内容</th>
+                    <th>診察券番号</th>
+                    <th>IP</th>
+                    <th>端末情報</th> 
+                </tr>
+                <% logs.forEach(function(log,index){ %>
+                    <tr>
+                        <td><%=log.LOG_date%></td>
+                        <td><%=log.LOG%></td>
+                        <td><a href="<%=Env.admin%>?mode=userchange&sid=<%=log.SID%>&id=<%=form.id%>"><%=log.SID%></a></td>
+                        <td><%=log.ip%></td>
+                        <td><%=log.term%></td>
+                    </tr>
+                <% }); %>
+            </table>
+
+            
+            
+    </div>
+    <%- include('./footer.ejs'); %>
+    <script type="text/javascript" src="/js/admin-c.js"></script>
+</body>
+</html>

@@ -1,0 +1,121 @@
+<%- include('./header.ejs', {Env: Env}); %>
+
+<body>
+<%- include('./navbar.ejs', {Env: Env}); %>
+
+<div id="container" class="container">
+		<nav aria-label="パンくずリスト">
+			<ol class="breadcrumb">
+				<li class="breadcrumb-item active" aria-current="page">ホーム</li>
+			</ol>
+		</nav>
+	<div class="jumbotron">
+		<h3><%= ptinfo.name1 + ptinfo.name2 %>さん、ようこそ</h3>
+    <div id="plan" class="m-auto">
+			<% plans.forEach(function (plan, key) { %>
+       	<h3><%= plan.year %>年度<%= plan.name %></h3>
+					<ul>
+            <% errors.forEach(function (value, key) { %>
+              <li class="text-danger"><%= value %></li>
+            <% }); %>
+					</ul>
+					<p class="text-info"><%= plan.text %></p>
+            <h4>予約受付期間</h4>
+              <div class="row m-3">
+                <strong><%= plan.y_start %></strong> から 
+              
+				<% if(plan.preopen == 0){ %>
+					<div class="btn text-white bg-success ml-3">予約受付中</div>
+				<% } else if(plan.full == 1){ %>
+					<div class="btn text-white bg-danger  ml-3">予約終了</div>
+				<% } else{ %>
+					<div class="btn text-white bg-warning ml-3">予約開始前</div>
+				<% } %>
+			  </div>
+  
+			<h4>接種期間</h4>
+				<div class="m-3"><strong><%= plan.start %></strong> から <strong><%= plan.end %></strong> まで</div>
+			<h4>料金</h4>
+				<div class="m-3">1回目:<strong><%= plan.price1 %></strong>円、2回目:<strong><%= plan.price2 %></strong>円</br>
+				<!-- (茨木市在住の中学三年生までの方は、1回あたり2000円の公費助成があります)</br>
+					(茨木市在住の65歳以上の方は無料となります)
+				-->
+				</div>
+			<h4>接種回数</h4>
+				<div class="m-3"><%= plan.detail %></div>
+					<br>
+			<h4>備考</h4>
+				<ul>
+					<li>2回接種の方は、2回目の予約も同時にお取りいただくようお願いいたします</li>
+					<li>新型コロナワクチンとの接種間隔制限はなくなりました</li>
+					<li>午前は9:30から11:30、午後は16:00から17:30が接種時間になります。本年は発熱外来も運営しており、時間帯に遅れますと感染のリスクもありますので、時間厳守でお願いします</li>
+					<li>問診票は<a href="https://yuuki-jibika.com/blog/ent/flu_monsin.pdf">こちら</a>からダウンロードできますので、プリントアウトしてお持ちください</li>
+					<li>メールアドレスを登録いただきますと予約日前に確認メールを受け取れますので、<a href="<%= Env.https_path %>?mode=mailform">こちら</a>からご登録ください。</li>
+					<%# <p class="text-info">公費助成を受けられる方（茨木市在住の中学3年生までの方と65歳以上の方）は、専用の問診表が必要ですので、当院窓口に来ていただくか、市の保健医療センターにお尋ねください。</p> %>
+
+					<% if(plan.preopen == 1){ %>
+						<li><p class="text-danger"><%= plan.y_start %>から予約を開始しますので、現在「新規予約」「予約確認・変更・キャンセル」の項目は選択できません</p></li>
+					<% } %>
+				</ul>
+				<br>
+			<div>
+				<% if(plan.preopen == 1){ %>
+					<!--横並びボタン-->
+					<div class="d-none d-md-block">
+						<div class="btn-group  d-flex mb-1">
+							<a class="btn btn-lg btn-outline-primary disabled w-50"  role="button"  aria-disabled="true" href="<%= Env.https_path %>">新規予約</a>
+							<a class="btn btn-lg btn-outline-primary disabled w-50"  role="button"  aria-disabled="true" href="<%= Env.https_path %>">予約確認・変更・キャンセル</a>
+						</div>
+						<div class="btn-group  d-flex mb-1">
+							<a class="btn btn-lg btn-outline-primary w-50"  role="button" href="<%= Env.https_path %>?mode=familyedit">家族情報の登録・削除</a>
+							<a class="btn btn-lg btn-outline-primary w-50"  role="button" href="<%= Env.https_path %>?mode=mailform">メールアドレス登録・削除</a>
+						</div>
+					</div>
+					
+					<!--縦並びボタン-->
+					<div class="d-block d-md-none">
+						<div class="btn-group-vertical d-flex">
+							<a class="btn btn-lg btn-outline-primary disabled "  role="button" aria-disabled="true" href="<%= Env.https_path %>">新規予約</a>
+							<a class="btn btn-lg btn-outline-primary disabled "  role="button" aria-disabled="true" href="<%= Env.https_path %>">予約確認・変更・キャンセル</a>
+							<a class="btn btn-lg btn-outline-primary"  role="button" href="<%= Env.https_path %>?mode=familyedit">家族情報の登録・削除</a>
+							<a class="btn btn-lg btn-outline-primary"  role="button" href="<%= Env.https_path %>?mode=mailform">メールアドレス登録・削除</a>
+						</div>
+					</div>
+					
+				<% } else { %>
+					<!--横並びボタン-->
+					<div class="d-none d-md-block">
+						<div class="btn-group  d-flex mb-1">
+							<a class="btn btn-lg btn-outline-primary w-50"  role="button" href="<%= Env.https_path %>?mode=reservenew&plan=<%= plan.id %>">新規予約</a>
+							<a class="btn btn-lg btn-outline-primary w-50"  role="button" href="<%= Env.https_path %>?mode=reservechange&plan=<%= plan.id %>">予約確認・変更・キャンセル</a>
+						</div>
+						<div class="btn-group  d-flex mb-1">
+							<a class="btn btn-lg btn-outline-primary w-50"  role="button" href="<%= Env.https_path %>?mode=familyedit">家族情報の登録・削除</a>
+							<a class="btn btn-lg btn-outline-primary w-50"  role="button" href="<%= Env.https_path %>?mode=mailform">メールアドレス登録・削除</a>
+						</div>
+					</div>
+					
+					<!--縦並びボタン-->
+					<div class="d-block d-md-none">
+						<div class="btn-group-vertical d-flex">
+							<a class="btn btn-lg btn-outline-primary"  role="button" href="<%= Env.https_path %>?mode=reservenew&plan=<%= plan.id %>">新規予約</a>
+							<a class="btn btn-lg btn-outline-primary"  role="button" href="<%= Env.https_path %>?mode=reservechange&plan=<%= plan.id %>">予約確認・変更・キャンセル</a>
+							<a class="btn btn-lg btn-outline-primary"  role="button" href="<%= Env.https_path %>?mode=familyedit">家族情報の登録・削除</a>
+							<a class="btn btn-lg btn-outline-primary"  role="button" href="<%= Env.https_path %>?mode=mailform">メールアドレス登録・削除</a>
+						</div>
+					</div>
+				<% } %>
+			</div>
+      <% }); %>
+		</div>
+
+			
+		<!--{/foreach}-->
+	</div>
+</div>
+
+<%- include('./footer.ejs'); %>
+
+</body>
+
+</html>

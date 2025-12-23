@@ -1,0 +1,57 @@
+<%- include('./header.ejs', {Env: Env}); %>
+<body>
+    <%- include('./navbar-admin.ejs', {Env: Env,form:form}); %>
+    
+    <div id="container"  class="container">
+        
+        <h2>ダイレクトメール送信</h2>
+            <ul>
+                <% errors.forEach(function(error){ %>
+                    <li class="attention"><%=error%></li>
+                <% }); %>
+            </ul>
+            <a href="<%=Env.admin%>?mode=maillist&id=<%=form.id%>" role="button" class="btn btn-primary">送信履歴</a>
+
+            <form action="<%=Env.admin%>" method="get">
+                <input type="hidden" name="mode" value="mailsend" />
+                <input type="hidden" name="id" value="<%=form.id%>" />
+                <h3>送信内容</h3>
+                    <h5>Title</h5>
+                        <input type="text" name="mailtitle" class="form-control"/>
+
+                    <h5>本文</h5>
+                        <textarea name="content" class="form-control" rows="6"></textarea>
+                    <h5>テンプレート</h5>
+                        <div class="jumbotron">
+                            <pre><%= template %></pre>
+                        </div>
+                    <button type="submit" id="sendmail" class="btn btn-primary">送信</button>
+
+                <h3>送信リスト</h3>
+                    <table class="table table-striped">
+                        <tr>
+                            <th><input type="checkbox" name="checkall" id="checkall" checked />全て選択</th>
+                            <th>ユーザーID</th>
+                             <th>姓名</th> 
+                            <th>メールアドレス</th>
+                        </tr>
+                        <% users.forEach(function(user){ %>
+                            <tr>
+                                <td><input type="checkbox" name="ptuids[]"  value="<%=user.UID%>"/ checked></td>
+                                <td><%=user.UID%></td>
+                                <td><%=user.name1%><%=user.name2%></td>
+                                <td><%=user.email%></td>
+                            </tr>
+                        <% }); %>
+                    </table>
+        
+        <div id="navi" class="form-group mt-3">
+            <a href="#" class="btn btn-info"  role="button" id="backbtn">戻る</a>
+        </div>
+    </div>
+<%- include('./footer.ejs'); %>
+<script type="text/javascript" src="/js/admin-c.js"></script>
+
+</body>
+
+</html>

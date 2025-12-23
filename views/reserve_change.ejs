@@ -1,0 +1,58 @@
+<%- include('./header.ejs', {Env: Env}); %>
+<body>
+    <%- include('./navbar.ejs', {Env: Env}); %>
+    
+    <div id="container" class="container">
+        <nav aria-label="パンくずリスト">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="<%= Env.https_path %>">ホーム</a></li>
+                <li class="breadcrumb-item active" aria-current="page">予約の確認・変更・キャンセル</li>
+            </ol>
+        </nav>
+        <div class="jumbotron">
+            <h2>予約確認</h2>
+                <% if(res.length === 0){ %> 予約がありません <% } else { %>
+                    <form action="<%= Env.https_path %>" method="get">
+                    <input type="hidden" name="mode" value="reserveedit" />
+                    <input type="hidden" name="plan" value="<%=form.plan%>" />
+                    <div class="form-check">
+                            <ul class="list-group">
+                                <% let d='', z=0; %>
+                                <% res.forEach(function(r){ %>
+                                    <% if(r.j_date != d ||  r.PT_zone !=  z){ %>
+                                        <h4 class="mt-5"><%=r.j_date%> <%=r.zonename%></h4>
+                                    <% } %>
+                                        <li class="list-group-item"> 
+                                            <% if(r.state == ''){ %>
+                                                <input type="checkbox" name="resids[]" value="<%=r.ID%>" class="form-check-input"/>
+                                            <% } %> 
+                                            <%=r.PT_name%> 様(<%=r.PT_age%>歳) <%=r.Vac_name%>回目 <%=r.state%>
+                                        </li>
+                                        <% d = r.j_date; z = r.PT_zone; %>
+                                <% }); %>
+                            </ul>
+                        
+                    </div>
+                    <div class="form-inline mt-2">
+                        <select name="change_act" class="form-control">
+                            <option value="1">予約日を変更</option>
+                            <option value="9">キャンセルする</option>
+                        </select>
+                        <input type="submit" value="次へ" class="btn btn-primary m-2"/>
+                    </div>
+                    <div>
+                        予約を変更・キャンセルする場合は、変更したい予約項目にチェックを入れ、上のメニューを選択し、「次へ」ボタンを押して下さい
+                    </div>
+                    <p class="text-danger">複数の予約を選択して変更すると、変更後の日付はすべて同じ日になります。異なる日付に変更を希望される場合は、一人ずつ選択して変更を行ってください</p>
+                </form>
+                <% } %>
+        </div>
+        <div id="navi" class="form-group">
+            <a href="#" class="btn btn-info mt-1"  role="button" id="backbtn">戻る</a>
+        </div>
+    </div>
+<%- include('./footer.ejs'); %>
+
+</body>
+
+</html>

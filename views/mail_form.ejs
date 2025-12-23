@@ -1,0 +1,58 @@
+<%- include('./header.ejs', {Env: Env}); %>
+<body>
+    <%- include('./navbar.ejs', {Env: Env}); %>
+    
+    <div id="container" class="container">
+        <nav aria-label="パンくずリスト">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="<%= Env.https_path %>">ホーム</a></li>
+                <li class="breadcrumb-item active" aria-current="page">メール登録</li>
+            </ol>
+        </nav>
+        <div class="jumbotron">
+            <% if(ptdata.registed) { %>
+                <h2>メールアドレスの削除・変更</h2>
+                <ul class="list-group">
+                    <li class="list-group-item">現在登録中のメールアドレス： <%=ptdata.email%></li>
+                </ul>
+                <a href="<%=Env.https_path %>?mode=maildelete&amp;ptuid=<%=ptdata.UID%>" role="button" id="btnmaildel" class="btn btn-danger mt-1">メール登録を削除</a>
+                <br/>
+                <div class="mt-3">
+                    メールアドレスを変更する場合は、下記に新しいメールアドレスを入力し、仮登録メールを送信ボタンを押して変更作業を行ってください。
+                </div>  
+            <% } else { %>
+                <h2>メールアドレスの登録</h2>
+                    メールアドレスを登録いただきますと、
+                    <ul class="list-group ml-5">
+                        <li>接種日が近づいたときの通知</li>
+                        <li>ワクチン接種日の臨時休診等の連絡</li>
+                    </ul>
+                    などを受け取ることができます。<br><br>
+                    メールアドレスを入力、送信後、送られてきた認証コードを入力し、本登録を行ってください。<br>
+                    
+            <% } %>
+                    <form action="<%= Env.https_path %>" method="get">
+                        <div class="form-group">
+                            <input type="hidden" name="mode" value="mailregist" />
+                            <input type="email" name="email" class="form-control"  placeholder="example@aaa.bbb.jp">
+                            <button type="submit" class="btn btn-primary mt-1" value="send" >仮登録メールを送信</button>
+                        </div>
+                    </form> 
+        
+                    <ul class="list-group">
+                        <li class="list-group-item">ドメイン受信設定をされている場合：@yuuki-jibika.com ドメインの受信許可設定をしてください。</li>
+                        <li class="list-group-item">メールアドレス受信設定をされている場合：vaccine@yuuki-jibika.com からの受信許可設定をしてください。</li>
+                        <li class="list-group-item">迷惑メールフィルターを利用されている場合：当院からのメールが迷惑メールフォルダーに振り分けられることが
+                        ありますので、ご注意ください。</li>
+                        <li class="list-group-item">個人情報保護規定に従い、登録いただいたメールアドレスを当院以外に提供することはありません。</li>
+                    </ul>   
+            <div id="navi" class="form-group">
+                <a href="#" class="btn btn-info mt-3"  role="button" id="backbtn">戻る</a></li>
+            </div>
+        </div>
+    </div>
+    <%- include('./footer.ejs'); %>
+
+</body>
+
+</html>

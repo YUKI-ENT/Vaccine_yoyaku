@@ -1,0 +1,103 @@
+<%- include('./header.ejs', {Env: Env}); %>
+<body>
+    <%- include('./navbar-admin.ejs', {Env: Env,form:form}); %>
+    
+    <div id="container"  class="container">
+    <h2>Plan編集(編集注意!!)</h2>
+        <ul>
+            <% errors.forEach(function(error){ %>
+                <li class="text-danger"><%=error %></li>
+            <% }); %>
+            
+        </ul>
+
+        <form action="<%= Env.admin %>" method="get">
+            <input type="hidden" name="mode" value="plan" />
+                <dl>
+                    <dt>年度情報</dt>
+                    <dd>
+                        <select name="id" id="select_year" class="form-control" >
+                            <% plans.forEach(function(p){ %>
+                                <option value="<%=p.id%>" <% if(p.id == plan){ %> selected="selected" <% } %> ><%= p.year %>年度</option>
+                            <% }); %>
+                        </select>
+                    </dd>
+                </dl>
+        </form>
+
+        <% plans.forEach(function(p){ %>
+            <% if(p.id == form.id){ %>
+                <div class="jumbotron">
+                    <form action="<%= Env.admin %>" method="get" >
+                        <input type="hidden" name="mode" value="planchange" />
+                        <input type="hidden" name="break" value="1" />
+                        <input type="hidden" name="sort" value="1" />
+                    
+                        <table class="table">
+                            <tr><th  scope="col">Plan ID</th><td><input type="number" name="id" id="planid" size="4" value="<%=p.id%>" class="form-control"/></td></tr>
+                            <tr><th scope="col">予約名</th> <td><input type="text" name="name" size="50" value="<%=p.name%>" class="form-control"/></td></tr>			
+                            <tr><th scope="col">説明</th> <td><textarea name="text" cols="50" rows="3" class="form-control"><%=p.text%></textarea></td></tr>
+                            <tr><th scope="col">詳細</th> <td><textarea name="detail" cols="50" rows="3" class="form-control"><%=p.detail%></textarea></td></tr>
+                            <tr><th scope="col">予約開始日</th> <td><input type="datetime-local" name="y_start"  value="<%=p.y_start%>" class="form-control"/></td></tr>
+                            <tr><th scope="col">予約終了日</th> <td><input type="datetime-local" name="y_end"  value="<%=p.y_end%>" class="form-control"/></td></tr>
+                            <tr><th scope="col">接種開始日</th><td><input type="date" name="start"  value="<%=p.start%>" class="form-control"/></td></tr>
+                            <tr><th scope="col">接種終了日</th><td><input type="date" name="end"  value="<%=p.end%>" class="form-control"/></td></tr>
+                            <tr><th scope="col">受付期日</th> <td><div class="form-row"><div class="col"><input type="number" name="apply" size="2" value="<%=p.apply%>" class="form-control"/> </div><div class="col">日前まで受付</div></div></td></tr>
+                            <tr><th scope="col">キャンセル期日</th> <td><div class="form-row"><div class="col"><input type="number" name="cancel" size="2" value="<%=p.cancel%>" class="form-control"/> </div><div class="col">時間前まで受付</div></div></td></tr>
+                            <tr><th scope="col">1回目価格</th> <td><div class="form-row"><div class="col"><input type="number" name="price1" size="4" value="<%=p.price1%>" class="form-control"/> </div><div class="col">円</div></div></td></tr>
+                            <tr><th scope="col">2回目価格</th> <td><div class="form-row"><div class="col"><input type="number" name="price2" size="4" value="<%=p.price2%>" class="form-control"/> </div><div class="col">円</div></div></td></tr>
+                            <tr><th scope="col">シリンジモード</th>
+                                <td>
+                                    <div class="form-check form-check-inline">
+                                        <input type="radio" name="syringe" id="syringe" value="1" <% if(p.syringe == 1){ %>checked <% } %> class="form-check-input"/> <label class="form-check-label" for="syringe">シリンジ </label>
+                                    </div>
+                                    <div class="form-check form-check-inline"></div>
+                                        <input type="radio" name="syringe" id="syringe2" value="0" <% if(p.syringe == 0){ %> checked <% } %> class="form-check-input"/><label class="form-check-label" for="syringe2">バイアル</label>
+                                    </div>
+                                </td></tr>
+                            <tr><th scope="col">ワクチン本数</th> <td><div class="form-row"><div class="col"><input type="number" name="vial" size="2" value="<%=p.vial%>" class="form-control"/></div><div class="col">本</div></div></td></tr>
+                            <tr><th scope="col">ml/バイアル</th><td><input type="number" name="mlpervial" step="0.1" value="<%=p.mlpervial%>" class="form-control"/></td></tr>
+                            <tr><th scope="col">標準接種量(ml)</th><td><input type="number" name="std_dose" step="0.1" value="<%=p.std_dose%>" class="form-control"/></td></tr>
+                            <tr><th scope="col">半量接種の年齢</th><td><div class="form-row"><div class="col"><input type="number" name="halfdoseage" step="1" value="<%=p.halfdoseage%>" class="form-control"/></div><div class="col">歳未満</div></div></td></tr>
+                            <tr><th scope="col">接種間隔</th><td><div class="form-row"><div class="col"><input type="number" name="intweek" step="1" value="<%=p.intweek%>" class="form-control"/></div><div class="col">週</div></div></td></tr>
+                            <tr><th scope="col">状態</th> 
+                                <td>
+                                    <div class="form-check form-check-inline">
+                                        <input type="radio" name="stat" id="stat1" value="1" class="form-check-input" <% if(p.stat == 1){ %>checked <% } %> />
+                                        <label class="form-check-label" for="stat1">有効</label> 
+                                    </div>
+                                    <div class="form-check form-check-inline">
+                                        <input type="radio" name="stat" id="stat0" value="0" class="form-check-input" <% if(p.stat == 0){ %>checked <% } %> />
+                                        <label class="form-check-label" for="stat0">無効</label>
+                                    </div>
+                                </td></tr>
+                            <tr><th scope="col">新規〆切</th> 
+                                <td>
+                                    <div class="form-check form-check-inline">
+                                        <input type="radio" name="full" id="full" value="1" <% if(p.full == 1){ %>checked <% } %> class="form-check-input"/>
+                                        <label class="form-check-label" for="full">これ以上新規予約を受け付けない</label>
+                                    </div>
+                                    <div class="form-check form-check-inline">
+                                        <input type="radio" name="full" id="full0" value="0" <% if(p.full == 0){ %>checked <% } %> class="form-check-input"/>
+                                        <label class="form-check-label" for="full0">新規予約受け入れ可</label>
+                                    </div>
+                                </td></tr> 
+                            <tr><th scope="col"></th><td>
+                                <input type="submit" name="add" id="btnadd" value="コピーして新規追加" class="btn btn-primary"/>
+                                <input type="submit" name="edit" id="btnedit" value="更新" class="btn btn-primary"/>
+                                <input type="reset"  value="元に戻す" class="btn btn-info"/>
+                                </td>
+                            </tr>
+                        </table>
+                    </form>
+                </div>
+            <% } %>
+        <% }); %>
+        
+    </div>
+    <%- include('./footer.ejs'); %>
+    <script type="text/javascript" src="/js/admin-c.js"></script>
+
+</body>
+
+</html>

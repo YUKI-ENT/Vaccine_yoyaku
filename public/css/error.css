@@ -1,0 +1,113 @@
+@charset "utf-8";
+
+/********* HTMLリセット *********************************************/
+
+body, div, h1, h2, h3, h4, h5, h6, p, ul, ol, li, dl, dt, dd, pre, blockquote, th, td, form, fieldset, input, textarea {
+	margin: 0;
+	padding: 0;
+}
+h1, h2, h3, h4, h5, h6 {
+	font-size: 100%;
+	font-weight: normal;
+}
+em, strong, code, address, th {
+	font-weight: normal;
+	font-style: normal;
+}
+ul, ol {
+	list-style: none;
+}
+q:before, q:after {
+	content: "";
+}
+abbr, acronym {
+	border: 0;
+}
+table {
+	border-collapse: collapse;
+	border-spacing: 0;
+}
+th {
+	text-align: left;
+}
+fieldset, img {
+	border: 0;
+}
+
+/********* HTML再定義 ***********************************************/
+
+body {
+	line-height: 1.4;
+	margin: 0 auto;
+	padding: 10px;
+	background-color: #EEEEEE;
+	color: #000000;
+	font-size: 80%;
+	font-family: "ヒラギノ角ゴ Pro W3", "Hiragino Kaku Gothic Pro", "メイリオ", Meiryo, "ＭＳ Ｐゴシック", sans-serif;
+}
+
+h1 {
+	line-height: 1.0;
+	margin-bottom: 15px;
+	padding-bottom: 10px;
+	border-bottom: 1px solid #999999;
+	font-size: 200%;
+	font-weight: bold;
+}
+
+p {
+	margin: 10px 0;
+}
+em, strong {
+	font-style: normal;
+	font-weight: bold;
+}
+ul {
+	margin: 10px 20px;
+}
+ul li {
+	list-style: disc;
+}
+address {
+	padding-top: 10px;
+	border-top: 1px solid #999999;
+}
+img {
+	vertical-align: middle;
+	margin: auto 1px;
+}
+
+a:link, a:visited {
+	color: #0000CC;
+	text-decoration: underline;
+}
+a:active, a:hover {
+	color: #FF7700;
+	text-decoration: underline;
+}
+
+/********* 基本構造 *************************************************/
+
+div#container {
+	width: 500px;
+	margin: 0 auto;
+	padding: 20px;
+	border: 1px solid #666666;
+	background-color: #FFFFFF;
+}
+
+/********* 個別指定 *************************************************/
+
+.attention {
+	color: #FF0000;
+	font-weight: bold;
+}
+
+/********* IE6用設定 ************************************************/
+
+* html body {
+	text-align: center;
+}
+* html body div#container {
+	text-align: left;
+}

@@ -1,0 +1,74 @@
+<%- include('./header.ejs', {Env: Env}); %>
+
+<body>
+
+<nav class="navbar navbar-expand-md navbar-dark bg-dark mb-4">
+  <a class="navbar-brand" href="<%= Env.https_path %>"><%= Env.title %></a>
+  <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation">
+    <span class="navbar-toggler-icon"></span>
+  </button>
+  <div class="collapse navbar-collapse" id="navbarCollapse">
+    <ul class="nav navbar-nav mr-auto">
+    </ul>
+    <ul class="nav navbar-nav">
+      <li class="nav-item">
+        <a class="nav-link" href="https://yuuki-jibika.com/">ゆうき耳鼻咽喉科ホーム<span class="sr-only">(current)</span></a>
+      </li>
+    </ul>
+    
+    
+  </div>
+</nav>
+
+<div id="container" class="container">
+	<div class="jumbotron">
+		<div id="menu" class="center-block">
+			<h2>ログイン</h2>
+			<ul>
+			    <li>当院の診察券をお持ちの方のみ、当システムの利用が可能です。</li>
+			    <li>初診の方でもご家族に当院の受診歴があれば、ご家族診察券番号でログイン後「家族登録」をしていただくことにより予約が可能です。</li>
+			    <li>診察券番号(診察券に記載の4桁か5桁の数字)と生年月日を入力してください。</li>
+			    <% errors.forEach(function (value, key) { %>
+                    <li class="text-danger"><%= value %></li>
+                <% }); %>
+
+			</ul>
+		</div>
+
+		<% if(deny == 0){ %> 
+		<form name="ulogin" action="/login" method="post">
+			<div class="form-group">
+				<label for="sid">診察券番号 ： </label>
+				<input type="number" id="sid" name="sid" size="5" istyle="4" format="*N" mode="numeric" class="form-control"/>
+			</div>
+			
+			<div class="form-group">
+                <label for="birth">生年月日(西暦) ：</label>
+            </div>
+            <div>
+                <input type="text" class="form-control"  placeholder="年/月/日"  name="birth" id="birth_picker">
+            </div>
+			
+			<div class="form-group">
+				<button name="action" class="btn btn-lg btn-primary mt-3" type="submit" value="ログインする">ログインする</button>
+			</div>
+		</form>
+		<% } else { %>
+			<div class="text-danger">
+				規定回数を超えてログイン失敗がありましたので、セキュリティ保護のため本日中のログイン操作を遮断しました。<br>
+				診察券番号を確認の上、明日以降再度アクセスください。
+			</div>
+		<% } %>	
+		
+		<div id="menu2" class="center-block">
+			<ul>
+			    <li>ログインできない等不具合がございましたら<a href="https://yuuki-jibika.com/about/troubleform.html" target="_blank">こちら</a>からお問い合わせください。</li>
+			</ul>
+		</div>
+	</div>
+</div>
+<%- include('./footer.ejs'); %>
+
+</body>
+
+</html>

@@ -1,0 +1,21 @@
+<%- include('./header.ejs', {Env: Env}); %>
+
+<body>
+<%- include('./navbar.ejs', {Env: Env}); %>
+
+<div id="container" class="container">
+	<div class="jumbotron">
+		<h3>ページが見つかりません</h3>
+        <ul>
+        <% errors.forEach(function (value, key) { %>
+            <li class="text-danger">こちらのアドレスは無効です：<%= value %></li>
+        <% }); %>
+        </ul>
+		<div id="navi" class="form-group">
+			<a href="#" class="btn btn-info"  role="button" id="backbtn">戻る</a>
+		</div>
+	</div>	
+</div>
+<%- include('./footer.ejs'); %>
+</body>
+</html>

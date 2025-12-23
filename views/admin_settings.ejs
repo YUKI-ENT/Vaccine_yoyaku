@@ -1,0 +1,31 @@
+<%- include('./header.ejs', {Env: Env}); %>
+<body>
+    <%- include('./navbar-admin.ejs', {Env: Env,form:form}); %>
+    <div id="container"  class="container">
+        <ul>
+            <% errors.forEach(function(error){ %>
+                <li class="text-danger"><%=error %></li>
+            <% }); %>
+        </ul>
+                
+	    <h2>システム設定</h2>
+        <form action="<%= Env.admin %>" method="get">
+            <input type="hidden" name="mode" value="settings" />
+            <input type="hidden" name="id" value="<%=form.id%>" />
+            <table class="table"> 
+                <% settings.forEach((s)=>{ %>
+                    <tr>
+                        <th><%=s.item%><input type="hidden" name="items[]" value="<%=s.item%>" /></th>
+                        <td><input type="text" class="form-control" name="vals[]" value="<%=s.val%>" maxlength="256"></td> 
+                    </tr>
+                <% }); %>
+                </table>
+            <button type="submit" name="submit" value="変更" class="btn btn-primary">変更</button>
+        </form>
+         
+            
+    </div>
+    <%- include('./footer.ejs'); %>
+    <script type="text/javascript" src="/js/admin-c.js"></script>
+</body>
+</html>

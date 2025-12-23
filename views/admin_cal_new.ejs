@@ -1,0 +1,127 @@
+<%- include('./header.ejs', {Env: Env}); %>
+<body>
+    <%- include('./navbar-admin.ejs', {Env: Env,form:form}); %>
+    
+    <div id="container"  class="container">
+        <ul>
+            <% errors.forEach(function(error){ %>
+                <li class="attention">error}/li>
+            <% }); %>
+            
+        </ul>
+        <form action="<%= Env.admin %>" method="get">
+            <input type="hidden" name="mode" value="cal" />
+            年度選択
+            <select name="id" id="select_year" class="form-control" >
+                <% plans.forEach(function(p){ %>
+                    <option value="<%=p.id%>" <% if(p.id == form.id){ %> selected="selected" <% } %> ><%= p.year %>年度</option>
+                <% }); %>
+            </select>
+        </form>
+        <form action="<%= Env.admin %>" method="get">
+            <input type="hidden" name="mode" value="cal" />
+            <input type="hidden" name="id" value="<%= form.id%>" />
+            
+            <div class="form-inline">
+                <select name="year"  id="select_year" class="form-control" >
+                <% years.forEach(function(year){ %>
+                    <option value="<%= year.id %>"<% if(year.flag){ %> selected="selected"<% } %>><%= year.id %>年</option>
+                <% }); %>
+                </select>
+                <select name="month" id="select_month" class="form-control">
+                <% months.forEach(function(month){ %>
+                    <option value="<%= month.id%>"<% if(month.flag){ %> selected="selected"<% } %>><%= month.id %>月</option>
+                <% }); %>
+                </select>
+                <noscript>
+                <input type="submit" value="表示する"  class="form-control"/>
+                </noscript>
+            </div>
+        </form>
+    
+	<h3><%= form.year %>年<%= form.month %>月の予約状況 </h3>
+        <ul>
+            <li>予約数：<%= tvial %>バイアル</li>
+        </ul>
+        <table summary="予約カレンダー表示" class="table table-bordered table-responsive-sm">
+            <tr>
+                <th class="table-danger">日</th>
+                <th class="table-light">月</th>
+                <th class="table-light">火</th>
+                <th class="table-light">水</th>
+                <th class="table-light">木</th>
+                <th class="table-light">金</th>
+                <th class="table-primary">土</th>
+            </tr>
+            <% calendars.forEach(function(calendar, index){ %>
+                <% if(index % 7 == 0){ %>
+                    <tr>
+                <% } %>
+                <% if(calendar.type === 'day' || calendar.type == 'satday'){ %>
+                    <% if(calendar.type === 'day'){ %>
+                        <% if(calendar.past == 1) { %>
+                            <td class="table-warning">
+                        <% } else { %>
+                            <td class="table-light">
+                        <% } %>
+                    <% } else { // Saturday %>
+                        <% if(calendar.past == 1) { %>
+                            <td class="table-warning">
+                        <% } else { %>
+                            <td class="table-primary">
+                        <% } %>
+                    <% } %>
+                    <%= calendar.day%><br/>
+                    <% if(calendar.rns.length > 0){ %>
+                        <% calendar.rns.forEach(function(rn){ %>
+                            <a href="<%=Env.admin%>?mode=cal&amp;id=<%=form.id %>&amp;year=<%=form.year %>&amp;month=<%=form.month %>&amp;day=<%=calendar.day %>&amp;zoneid=<%=rn.zoneid%>"><%=rn.zonename.slice(0,2)%>:<%=rn.num%></a><br/>
+                        <% }); %>
+                    <% } else { %>
+                        <% zones.forEach(function(zone){ %>
+                            <a href="<%=Env.admin%>?mode=cal&amp;id=<%=form.id %>&amp;year=<%=form.year %>&amp;month=<%=form.month %>&amp;day=<%=calendar.day %>&amp;zoneid=<%=zone.id%>"><%=zone.name.slice(0,2)%>:0</a><br/>
+                        <% }); %>
+                    <% } %>
+                    <% if(calendar.zan > 0){ %> <em>残:<%=calendar.zan %>ml</em> <% } %>
+                    </td>
+                <% } else if(calendar.type === 'sunday') { %>
+                    <td  class="table-danger">
+                        <%= calendar.day%><br/>
+                    </td>
+                <% } else { %>
+                    <td class="table-secondary">-</td>
+                <% } %>
+                <% if(index % 7 == 6){ %>
+                    </tr>
+                <% } %>
+            <% } ); //foreach %>
+        </table>
+
+        <% if(daymode === 1){  // 日詳細モード %>
+            <h3><%=form.month%>月<%=form.day%>日の予約状況</h3>
+                <% zones.forEach(function(zone){ %>
+                    <h4><%=zone.name%></h4>
+                        <form action="<%= Env.admin %>" method="get">
+                            <input type="hidden" name="mode" value="new" />
+                            <input type="hidden" name="year" value="<%=form.year%>" />
+                            <input type="hidden" name="month" value="<%=form.month%>" />
+                            <input type="hidden" name="day" value="<%=form.day%>" />
+                            <input type="hidden" name="zoneid" value="<%=zone.id%>" />
+                            <input type="hidden" name="zonename" value="<%=zone.name%>" />
+                            <input type="hidden" name="plan" value="<%=form.id%>" />
+                            <input type="submit" value="新規予約" class="btn btn-primary"/>
+                        </form>
+                    <ul class="list-group">
+                        <% reslists.forEach(function(r){ %>
+                            <% if(r.PT_zone == zone.id) { %>
+                                <li class="list-group-item"><a href="<%= Env.admin %>?mode=pt&amp;resid=<%=r.ID%>&amp;id=<%=form.id%>"><%=r.PT_name%>様(<%=r.PT_birth%>生:<%=r.PT_age%>歳)</a>：<%=r.Vac_name%>回目：<%=r.Vac_volume%>ml</li>
+                            <% } %>
+                        <% }); %> 
+                    </ul>
+                <% }); %>  
+        <% } %> 
+    </div>
+<%- include('./footer.ejs'); %>
+
+</body>
+
+</html>

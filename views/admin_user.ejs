@@ -1,0 +1,62 @@
+<%- include('./header.ejs', {Env: Env}); %>
+<body>
+    <%- include('./navbar-admin.ejs', {Env: Env,form:form}); %>
+    
+    <div id="container"  class="container">
+        
+        <h2>登録ユーザー一覧</h2>
+            <ul>
+                <% errors.forEach(function(error){ %>
+                    <li class="attention"><%=error%></li>
+                <% }); %>
+            </ul>
+            
+            <table class="table table-striped">
+                <tr>
+                    <th><a href="<%=Env.admin%>?mode=user&amp;sort=UID&amp;id=<%=form.id%>">ユーザーID</a></th>
+                    <th><a href="<%=Env.admin%>?mode=user&amp;sort=FID&amp;id=<%=form.id%>">家族ID</a></th> 
+                    <th><a href="<%=Env.admin%>?mode=user&amp;sort=SID&amp;id=<%=form.id%>">診察券番号</a></th>
+                    <th><a href="<%=Env.admin%>?mode=user&amp;sort=birth&amp;id=<%=form.id%>">誕生日</a></th>
+                    <th>main</th> 
+                    <th><a href="<%=Env.admin%>?mode=user&amp;sort=name1&amp;id=<%=form.id%>">姓</a></th>
+                    <th>名</th> 
+                    <th></th><th></th>
+                </tr>
+                <tr>
+                    <form action="<%=Env.admin%>" method="get">
+                        <input type="hidden" name="mode" value="user" />
+                        <input type="hidden" name="id" value="<%=form.id%>" />
+                        <td><input type="number" name="fuid" class="form-control"/></td>
+                        <td><input type="number" name="ffid" class="form-control"/></td>
+                        <td><input type="number" name="fsid" class="form-control"/></td>
+                        <td><input type="text" name="fbirth" class="form-control"/></td>
+                        <td></td>
+                        <td><input type="text" name="fname1" class="form-control"/></td>
+                        <td><input type="text" name="fname2" class="form-control"/></td>
+                        <td><input type="reset" value="リセット" class="btn-sm btn-danger"></td><td><input type="submit" value="フィルタ" class="btn-sm btn-primary"></td>
+                    </form>
+                </tr>
+                <% users.forEach(function(user){ %>
+                    <tr>
+                        <td><a href="<%=Env.admin%>?mode=userchange&amp;uid=<%=user.UID%>&amp;id=<%=form.id%>"><%=user.UID%></a></td>
+                        <td><%=user.FID%></td>
+                        <td><%=user.SID%></td>
+                        <td><%=user.birth%></td>
+                        <td><%=user.main%></td>
+                        <td><%=user.name1%></td>
+                        <td><%=user.name2%></td>
+                        <td></td><td></td>
+                    </tr>
+                <% }); %>
+            </table>
+        
+        <div id="navi" class="form-group mt-3">
+            <a href="#" class="btn btn-info"  role="button" id="backbtn">戻る</a>
+        </div>
+    </div>
+<%- include('./footer.ejs'); %>
+<script type="text/javascript" src="/js/admin-c.js"></script>
+
+</body>
+
+</html>

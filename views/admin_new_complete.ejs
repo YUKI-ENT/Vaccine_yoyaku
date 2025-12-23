@@ -1,0 +1,20 @@
+<%- include('./header.ejs', {Env: Env}); %>
+<body>
+    <%- include('./navbar-admin.ejs', {Env: Env,form:form}); %>
+    <div id="container"  class="container">
+        <h2>登録完了</h2>
+            <ul>
+                <li>手続きが完了しました。</li>
+                <li><a href="<%=Env.admin%>?mode=sheet&amp;plan=<%=plan%>">予約一覧ページ</a>で予約一覧をご確認下さい。</li>
+            </ul>
+
+            <div id="navi" class="form-group mt-3">
+                <a href="<%=Env.admin%>?plan=<%=plan%>" class="btn btn-primary"  role="button" id="topbtn">トップへ戻る</a>
+            </div>
+    </div>
+
+<%- include('./footer.ejs'); %>
+<script type="text/javascript" src="/js/admin-c.js"></script>
+        
+</body>
+</html>

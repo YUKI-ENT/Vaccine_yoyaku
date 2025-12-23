@@ -1,0 +1,59 @@
+<%- include('./header.ejs', {Env: Env}); %>
+<body>
+    <%- include('./navbar-admin.ejs', {Env: Env,form:form}); %>
+    <div id="container"  class="container">
+        <ul>
+            <% errors.forEach(function(error){ %>
+                <li class="text-danger"><%=error %></li>
+            <% }); %>
+        </ul>
+        <form action="<%= Env.admin %>" method="get">
+            <input type="hidden" name="mode" value="sheet" />
+                <dl>
+                    <dt>年度情報</dt>
+                    <dd>
+                        <select name="id" id="select_year" class="form-control" >
+                            <% plans.forEach(function(p){ %>
+                                <option value="<%=p.id%>" <% if(p.id == plan){ %> selected="selected" <% } %> ><%= p.year %>年度</option>
+                            <% }); %>
+                        </select>
+                    </dd>
+                </dl>
+        </form>
+        
+	    <h2>予約一覧</h2>
+            <% if(total === 0){ %>
+                <ul>
+                    <li class="text-danger">予約がありません</li>
+                </ul>
+            <% } else { %>
+                <ul>
+                    <li>予約：<%=total%>件(接種済：<%=sumi%>)</li>
+                </ul>
+            <% } %>
+            <table class="table table-responsive-sm">
+                <tr class="thead-light"><th></th>
+                    <th><a href="<%=Env.admin%>?mode=sheet&amp;sort=FID&amp;id=<%=plan%>">家族ID</a></th>
+                    <th><a href="<%=Env.admin%>?mode=sheet&amp;sort=UID&amp;id=<%=plan%>">UID</a></th> <th>plan</th> <th><a href="<%=Env.admin%>?mode=sheet&amp;sort=PT_date&amp;id=<%=plan%>">接種日</a></th>
+                    <th>時間帯</th> 
+                    <th><a href="<%=Env.admin%>?mode=sheet&amp;sort=PT_ID&amp;id=<%=plan%>">診察券番号</a></th> 
+                    <th>患者名</th> 
+                    <th><a href="<%=Env.admin%>?mode=sheet&amp;sort=PT_age&amp;id=<%=plan%>">年齢</a></th> 
+                    <th><a href="<%=Env.admin%>?mode=sheet&amp;sort=Vac_name&amp;id=<%=plan%>">回数</a></th>　
+                    <th><a href="<%=Env.admin%>?mode=sheet&amp;sort=Vac_volume&amp;id=<%=plan%>">量</a></th> 
+                    <th><a href="<%=Env.admin%>?mode=sheet&amp;sort=State&amp;id=<%=plan%>">状態</a></th> 
+                    <th><a href="<%=Env.admin%>?mode=sheet&amp;sort=PT_birth&amp;id=<%=plan%>">誕生日</a></th> 
+                    <th><a href="<%=Env.admin%>?mode=sheet&amp;sort=ID&amp;id=<%=plan%>">予約日</a></th> 
+                    <th>削除</th></tr>
+                <% res.forEach(function(r,index){ %>
+                    <tr <% if(r.past === 1 && r.State === 1) { %> class="table-warning" <% } else if(r.past === 1 && r.State ===0){ %> class="table-secondary" <% } %>>
+                    <td><%=index+1%></td><td><%=r.FID%></td><td><%=r.UID%></td><td><%=r.plan%></td><td><%=r.PT_date%></td><td><%=r.zonename%></td><td><%=r.PT_ID%></td><td><a href="<%=Env.admin%>?mode=pt&amp;resid=<%=r.ID%>"><%=r.PT_name%></a></td><td><%=r.PT_age%></td><td><%=r.Vac_name%></td><td><%=r.Vac_volume%></td><td><%=r.State%></td><td><%=r.PT_birth%></td><td><%=r.Y_date%></td><td><%=r.Del%></td>
+                </tr>
+                <% }); %>
+            </table>
+            
+    </div>
+    <%- include('./footer.ejs'); %>
+    <script type="text/javascript" src="/js/admin-c.js"></script>
+</body>
+</html>

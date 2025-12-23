@@ -1,0 +1,52 @@
+<%- include('./header.ejs', {Env: Env}); %>
+<body>
+    <%- include('./navbar-admin.ejs', {Env: Env,form:form}); %>
+    <div id="container"  class="container">
+        <h2>予約変更の確認</h2>
+        <ul>
+            <% errors.forEach(function(error){ %>
+                <li class="text-danger"><%=error %></li>
+            <% }); %>
+        </ul>
+        <h3>以下の日程に予約変更を行います</h3>
+            <form action="<%=Env.admin%>" method="get">
+                <input type="hidden" name="mode" value="changecomplete" />
+                <input type="hidden" name="resid" value="<%=res.ID%>" />
+                <input type="hidden" name="id" value="<%=res.plan%>" />
+                <table class="table">
+                    <tr>
+                        <th>患者名</th> <td><%=res.PT_name%>様 <%=res.PT_age%>歳</td>
+                    </tr>
+                    <tr>
+                        <th>予約日</th> 
+                        <td>
+                            <%=res.year%>年<%=res.month%>月<%=res.day%>日 <%=res.zonename%><br/>
+                            ⇒ 
+                            <% if(newres.del === 1) { %> 
+                                <em> キャンセル(予約削除)</em><input type="hidden" name="del" value="1" />
+                            <% } else { %>
+                                <div class="text-danger"><%=newres.year%>年<%=newres.month%>月<%=newres.day%>日(<%=newres.youbi%>) <%=newres.zonename%></div>
+                                <input type="hidden" name="year" value="<%=newres.year%>" />
+                                <input type="hidden" name="month" value="<%=newres.month%>" />
+                                <input type="hidden" name="day" value="<%=newres.day%>" />
+                                <input type="hidden" name="zoneid" value="<%=newres.zoneid%>" />
+                                <input type="hidden" name="zonename" value="<%=newres.zonename%>" />
+                                <input type="hidden" name="del" value="0" />
+                            <% } %>
+                        </td>
+                    </tr>
+                 </table>
+            
+                <input type="submit" class="btn btn-primary" value="上記を確定する" />
+            </form>
+
+            <div id="navi" class="form-group mt-3">
+                <a href="#" class="btn btn-info"  role="button" id="backbtn">戻る</a>
+            </div>
+    </div>
+
+<%- include('./footer.ejs'); %>
+<script type="text/javascript" src="/js/admin-c.js"></script>
+        
+</body>
+</html>

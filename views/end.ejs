@@ -1,0 +1,21 @@
+<%- include('./header.ejs', {Env: Env}); %>
+
+<body>
+<%- include('./navbar.ejs', {Env: Env}); %>
+
+<div id="container" class="container">
+	<div class="jumbotron">
+		<h3>操作が完了しました</h3>
+        <ul>
+        <% errors.forEach(function (value, key) { %>
+            <li class="text-primary"><%= value %></li>
+        <% }); %>
+        </ul>
+		<div id="navi" class="form-group">
+			<a href="<%= Env.https_path %>" class="btn btn-primary"  role="button">トップページへ</a>
+		</div>
+	</div>	
+</div>
+<%- include('./footer.ejs'); %>
+</body>
+</html>

@@ -1,0 +1,48 @@
+<%- include('./header.ejs', {Env: Env}); %>
+<body>
+    <%- include('./navbar-admin.ejs', {Env: Env,form:form}); %>
+    <div id="container"  class="container">
+        <h2>予約確認</h2>
+        <ul>
+            <% errors.forEach(function(error){ %>
+                <li class="text-danger"><%=error %></li>
+            <% }); %>
+        </ul>
+        <h3>以下の予約を行います</h3>
+            <h4>予約日：<%=res.year%>年<%=res.month%>月<%=res.day%>日 <%=res.zonename%></h4>
+            <form action="<%=Env.admin%>" method="get">
+                <input type="hidden" name="mode" value="newcomplete" />
+                <input type="hidden" name="year" value="<%=res.year%>" />
+                <input type="hidden" name="month" value="<%=res.month%>" />
+                <input type="hidden" name="day" value="<%=res.day%>" />
+                <input type="hidden" name="zoneid" value="<%=res.zoneid%>" />
+                <input type="hidden" name="zonename" value="<%=res.zonename%>" />
+                <input type="hidden" name="plan" value="<%=res.plan%>" />
+                <input type="hidden" name="family" value="<%=family%>" />
+                <table class="table">
+                    <thead>
+                        <tr><th scope="col">診察券番号</th><th scope="col">名前</th><th scope="col">生年月日</th></tr>
+                    </thead>
+                    <% pts.forEach(function(pt){ %>
+                        <tr>
+                            <td><input type="hidden" name="sids[]"  value="<%=pt.sid%>"/><%=pt.sid%>
+                            <input type="hidden" name="ptuids[]"  value="<%=pt.ptuid%>"/></td>
+                            <td><input type='hidden' name='dname1[]' value='<%=pt.dname1%>'/><%=pt.dname1%>
+                                <input type='hidden' name='dname2[]' value='<%=pt.dname2%>'/><%=pt.dname2%></td>
+                            <td><input type="hidden" name="births[]"  value="<%=pt.birth%>"/><%=pt.birth%>生</td>
+                        </tr>     
+                    <% });%>
+                </table>    
+                <input type="submit" value="上記の予約を確定する" class="btn btn-primary"/>
+            </form>
+
+            <div id="navi" class="form-group mt-3">
+                <a href="#" class="btn btn-info"  role="button" id="backbtn">戻る</a>
+            </div>
+    </div>
+
+<%- include('./footer.ejs'); %>
+<script type="text/javascript" src="/js/admin-c.js"></script>
+        
+</body>
+</html>
