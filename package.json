@@ -3,8 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "dev": "nodemon --legacy-watch bin/www -- -c config.js"
-//    "start": "node ./bin/www"
+    "dev": "nodemon --legacy-watch bin/www -- -c ./config.js"
   },
   "dependencies": {
     "@popperjs/core": "^2.9.2",
@@ -25,6 +24,10 @@
     "nodemailer": "^6.6.2",
     "passport": "^0.4.1",
     "passport-local": "^1.0.0",
-    "popper": "^1.0.1"
+    "popper": "^1.0.1",
+    "sanitize-html": "^2.17.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.11"
   }
 }

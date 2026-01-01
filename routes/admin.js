@@ -18,91 +18,96 @@ require('../bin/cronmail.js');
 const { callbackify } = require('util');
 const { parse } = require('path');
 
+const sanitizeHtml = require('sanitize-html');
+
 process.on('uncaughtException', function(err) {
     console.log('uncaughtException in admin.js!');
     console.log(err);
 });
 
 // グローバル変数 plans 
-let errors = [];
-let plans = [];
+// let errors = [];
+// let plans = [];
   
 /* GET admin listing. */
 router.get('/', adminMiddleware, async function(req, res, next){
+    let errors = res.locals.errors || [];
+    let plans = [];
+
     try{
+        plans = await sql.getAllPlans();
         let mode = (req.query.mode) ? req.query.mode : 'cal';
         //Globals
-        errors = [];
-        if(!plans.length) plans = await sql.getAllPlans();
+        // errors = [];
+        // if(!plans.length) plans = await sql.getAllPlans();
         
-        switch(mode){
+        switch (mode) {
             case 'cal':
-                admin_cal(req,res,0);
-                break;
+                return admin_cal(req, res, 0, plans, errors);
+
             case 'sheet':
-                admin_sheet(req,res);
-                break;
+                return admin_sheet(req, res, plans, errors);
+
             case 'new':
-                admin_new(req,res);
-                break;
+                return admin_new(req, res, plans, errors);
+
             case 'newconf':
-                admin_new_conf(req,res);
-                break;
+                return admin_new_conf(req, res, plans, errors);
+
             case 'newcomplete':
-                admin_new_complete(req,res);
-                break;
+                return admin_new_complete(req, res, plans, errors);
+
             case 'pt':
-                admin_pt(req,res);
-                break;
+                return admin_pt(req, res, plans, errors);
+
             case 'changeconf':
-                admin_change(req,res);
-                break;
+                return admin_change(req, res, plans, errors);
+
             case 'changecomplete':
-                admin_change_complete(req,res);
-                break;
+                return admin_change_complete(req, res, plans, errors);
+
             case 'plan':
-                admin_plan(req,res);
-                break;
+                return admin_plan(req, res, plans, errors);
+
             case 'planchange':
-                admin_planedit(req,res);
-                break;
+                return admin_planedit(req, res, plans, errors);
+
             case 'waku':
-                admin_waku(req,res);
-                break;
+                return admin_waku(req, res, plans, errors);
+
             case 'user':
-                admin_user(req,res);
-                break;
+                return admin_user(req, res, plans, errors);
+
             case 'userchange':
-                admin_userchange(req,res);
-                break;
+                return admin_userchange(req, res, plans, errors);
+
             case 'usercomplete':
-                admin_userchangecomplete(req,res);
-                break;
+                return admin_userchangecomplete(req, res, plans, errors);
+
             case 'zanryo':
-                admin_vial(req,res);
-                break;
+                return admin_vial(req, res, plans, errors);
+
             case 'log':
-                admin_log(req,res);
-                break;
+                return admin_log(req, res, plans, errors);
+
             case 'settings':
-                admin_settings(req,res);
-                break;
+                return admin_settings(req, res, plans, errors);
+
             case 'mail':
-                admin_mail(req,res);
-                break;
+                return admin_mail(req, res, plans, errors);
+
             case 'mailsend':
-                admin_mail_send(req,res);
-                break;
+                return admin_mail_send(req, res, plans, errors);
+
             case 'maillist':
-                admin_mail_list(req,res);
-                break;
+                return admin_mail_list(req, res, plans, errors);
+
             default:
-                admin_cal(req,res,0);
+                return admin_cal(req, res, 0, plans, errors);
         }
     } catch(e){
-        errors.push(e);
-        error_render(req,res,'admin / get');
-        return;
+        errors.push(e && e.stack ? e.stack : String(e));
+        return error_render(req, res, 'admin / get', plans, errors);
     } 
 });
 
@@ -119,6 +124,7 @@ router.post('/login', adminAuthenticate);
 
 function adminMiddleware(req,res,next){ 
     console.log('Admin middleware is called.');
+    if (!res.locals.errors) res.locals.errors = [];
     let hosts = resolve.arrhome();
     console.log("Reliable host list is :" );
     console.log(hosts);
@@ -131,7 +137,9 @@ function adminMiddleware(req,res,next){
     }
     else {  // 認証されていない
       console.log("Admin no session data");
-      errors.push('セッション期限が切れました。再度ログインしてください。');
+      // ★ グローバルではなく res.locals に積む
+      res.locals.errors.push('セッション期限が切れました。再度ログインしてください。');
+
       res.redirect(Env.admin + '/login');  // ログイン画面に遷移
     }
 }
@@ -154,7 +162,7 @@ function adminAuthenticate(req,res,next){
     }
 }
 
-async function admin_cal(req, res, daymode=0, year = 0, month = 0, contentday = 1, ptdata = {}) //カレンダーのみモード：0、日予定：１, 予約変更：２
+async function admin_cal(req, res, daymode=0, plans, errors, year = 0, month = 0, contentday = 1, ptdata = {}) //カレンダーのみモード：0、日予定：１, 予約変更：２
 {
     let planindex =0;
     let strdate = '';
@@ -318,16 +326,18 @@ async function admin_cal(req, res, daymode=0, year = 0, month = 0, contentday = 
         });
     } catch(e){
         console.log('Error in admin_cal:' + e);
-        error_render(req, res, 'admin_cal');
+        error_render(req, res, 'admin_cal', plans, errors);
     }
 }
 
-async function admin_plan(req,res){
+async function admin_plan(req,res, plans, errors){
     try{
         //plan取得
         const lastplan = (plans.length) ? parseInt(plans[0].id) : 0;
         const planid = (req.query.id) ? parseInt(req.query.id) : lastplan;
         
+        const rules = await sql.getPlanRules(planid);
+
         for(let i in plans){
             plans[i].y_start = moment(plans[i].y_start).format('YYYY-MM-DDTHH:mm'); //html5 datetime-local対策
             plans[i].y_end = moment(plans[i].y_end).format('YYYY-MM-DDTHH:mm');
@@ -340,18 +350,22 @@ async function admin_plan(req,res){
             errors: errors,
             form:{id: planid},
             plan: planid,
-            plans: plans       
+            plans: plans,
+            rules: rules       
         });
     } catch(e){
         console.log('Error in admin_plan:' + e);
-        error_render(req, res, 'admin_cal');
+        error_render(req, res, 'admin_cal', plans, errors);
     }
 }
 
-async function admin_planedit(req,res){
+async function admin_planedit(req,res, plans, errors){
     try{
         const edit = (req.query.edit) ? 1 : 0;
         let planid = parseInt(req.query.id);
+
+        // ★ 追加：ルールをパース（空でもOK）
+        const rules = parsePlanRulesFromQuery(req.query);   
 
         if (edit) { //更新モード
             const q = 'UPDATE ' + Db.T_plans +  ' SET ?  WHERE id = ?';
@@ -368,8 +382,8 @@ async function admin_planedit(req,res){
                 price2  : Number(req.query.price2),
                 apply   : Number(req.query.apply),
                 cancel  : Number(req.query.cancel),
-                text    : req.query.text.trim(),
-                detail  : req.query.detail,
+                text    : sanitizeAdminHtml(req.query.text),
+                detail  : sanitizeAdminHtml(req.query.detail),
                 sort    : Number(req.query.sort),
                 year    : moment(req.query.start).year(),
                 start_m : moment(req.query.start).month() + 1,
@@ -385,6 +399,8 @@ async function admin_planedit(req,res){
             let [result] = await sql.pool.query(q,[d,planid]);
             if(result.affectedRows){
                 errors.push('ID「' + planid  + '」の編集しました。');
+                // ★ 追加：年齢ルール保存（DELETE→INSERT）
+                await sql.replacePlanRules(planid, rules);
             } else {
                 errors.push('PlanデータのUPDATEに失敗しました');
             }
@@ -427,22 +443,56 @@ async function admin_planedit(req,res){
             let [result] = await sql.pool.query(q,[d]);
             if(result.affectedRows){
                 errors.push('ID「' + newplanid  + '」を追加しました。');
+                // ★ 追加：planidを新規IDに統一して保存
+                planid = newplanid;
+                await sql.replacePlanRules(planid, rules);
             } else {
                 errors.push('PlanデータのINSERTに失敗しました');
             }
         }
-        plans = [];
         plans = await sql.getAllPlans();
         //表示
-        admin_plan(req,res);
+        admin_plan(req,res, plans, errors);
 
     } catch(e){
         console.log('Error in admin_planedit:' + e);
-        error_render(req, res, 'admin_planedit');
+        error_render(req, res, 'admin_planedit', plans, errors);
     }	
 }
 
-async function admin_sheet(req,res){
+function parsePlanRulesFromQuery(q) {
+  // GETで配列が来ると、単発でも配列でも混ざるので concat で配列化
+  const mins  = [].concat(q.rule_min_age_m || []);
+  const maxs  = [].concat(q.rule_max_age_m || []);
+  const doses = [].concat(q.rule_required_doses || []);
+  const sorts = [].concat(q.rule_sort || []);
+  const notes = [].concat(q.rule_note || []);
+
+  const rules = [];
+  for (let i = 0; i < mins.length; i++) {
+    const min  = parseInt(mins[i], 10);
+    const max  = parseInt(maxs[i], 10);
+    const dose = parseInt(doses[i], 10);
+    const sort = parseInt(sorts[i], 10) || (i + 1);
+    const note = (notes[i] || '').trim();
+
+    // 空欄行は無視
+    if (Number.isNaN(min) || Number.isNaN(max) || Number.isNaN(dose)) continue;
+
+    // ざっくり最低限バリデーション（変な値を弾く）
+    if (min > max) continue;
+    if (dose < 1 || dose > 9) continue;
+
+    rules.push({ min_age_m: min, max_age_m: max, required_doses: dose, sort, note });
+  }
+
+  // sort順で正規化（DB側もsort使うので）
+  rules.sort((a, b) => a.sort - b.sort);
+  return rules;
+}
+
+
+async function admin_sheet(req,res, plans, errors){
     try{
         //plan取得
         const lastplan = (plans.length) ? parseInt(plans[0].id) : 0;
@@ -481,11 +531,11 @@ async function admin_sheet(req,res){
         });
     }catch(e){
         console.log('Error in admin_sheet:' + e);
-        error_render(req, res, 'admin_sheet');
+        error_render(req, res, 'admin_sheet', plans, errors);
     }	
 }
 
-async function admin_waku(req,res,change = 0){
+async function admin_waku(req,res, plans, errors,change = 0){
     try{
         //plan取得
         const lastplan = (plans.length) ? parseInt(plans[0].id) : 0;
@@ -598,11 +648,11 @@ async function admin_waku(req,res,change = 0){
         });
     } catch(e) {
         console.log('Error in admin_waku:' + e);
-        error_render(req, res, 'admin_waku');
+        error_render(req, res, 'admin_waku', plans, errors);
     }	
 }
 
-function admin_new(req, res){
+function admin_new(req, res, plans, errors){
     try{
         const rdata  = {
             num     : (req.query.num) ? parseInt(req.query.num) : 1,
@@ -624,11 +674,11 @@ function admin_new(req, res){
         });
     } catch(e) {
         console.log('Error in admin_new:' + e);
-        error_render(req, res, 'admin_new');
+        error_render(req, res, 'admin_new', plans, errors);
     }	
 }
 
-async function admin_new_conf(req,res){
+async function admin_new_conf(req,res, plans, errors){
     try{
         let family = (req.query.family)? req.query.family : 0;
         let sids = req.query.Karte;
@@ -644,7 +694,7 @@ async function admin_new_conf(req,res){
 
         if(!req.query.num){
             errors.push('予約人数が設定されていません');
-            error_render(req, res,'admin_new_conf');
+            error_render(req, res,'admin_new_conf', plans, errors);
             return;
         }
 
@@ -665,7 +715,7 @@ async function admin_new_conf(req,res){
                 ptinfos[i] = await sql.sid2ptinfo(sids[i]); //pt_masterから
                 if(!ptinfos[i]) {
                     errors.push(String(i) + '番目の診察券番号が正しくありません');
-                    error_render(req, res,'admin_new_conf');
+                    error_render(req, res,'admin_new_conf', plans, errors);
                     return;
                 }
                 let names = ptinfos[i].furigana.split('　');
@@ -681,11 +731,11 @@ async function admin_new_conf(req,res){
                 sids[i] = 0;
                 if(!req.query.dname1[i] || !req.query.dname2[i]) {
                     errors.push('名前が入力されていません');
-                    error_render(req, res, 'admin_new_conf');
+                    error_render(req, res, 'admin_new_conf', plans, errors);
                     return;
                 } else if(!req.query.birth[i]){
                     errors.push('誕生日が入力されていません');
-                    error_render(req, res, 'admin_new_conf');
+                    error_render(req, res, 'admin_new_conf', plans, errors);
                     return;
                 }
             }
@@ -744,11 +794,11 @@ async function admin_new_conf(req,res){
         });
     } catch(e) {
         console.log('Error in admin_new_conf:' + e);
-        error_render(req, res, 'admin_new_conf');
+        error_render(req, res, 'admin_new_conf', plans, errors);
     }
 }
 
-async function admin_new_complete(req,res){
+async function admin_new_complete(req,res, plans, errors){
     try{
         const year = parseInt(req.query.year);
         const month= parseInt(req.query.month);
@@ -799,11 +849,11 @@ async function admin_new_complete(req,res){
         return;
     } catch(e) {
         console.log('Error in admin_new_complete:' + e);
-        error_render(req, res, 'admin_new_complete');
+        error_render(req, res, 'admin_new_complete', plans, errors);
     }
 }
 
-async function admin_pt(req,res){
+async function admin_pt(req,res, plans, errors){
     try{
         let cal = 0, resid = 0, resdata = {}, other_res = {}, ptdata = {}, year, month, day;
 
@@ -812,14 +862,14 @@ async function admin_pt(req,res){
             cal   = (req.query.cal) ? req.query.cal : 0;
         }else {
             errors.push('不正なアクセスです。トップページからアクセスし治して下さい。');
-            error_render(req,res,'admin_pt');
+            error_render(req,res,'admin_pt', plans, errors);
             return;
         }
 
         resdata = await sql.getReserveInfo(resid);
         if(!resdata){
             errors.push('予約データが見つかりません。');
-            error_render(req,res,'admin_pt');
+            error_render(req,res,'admin_pt', plans, errors);
             return;
         }
 
@@ -853,12 +903,12 @@ async function admin_pt(req,res){
     } catch(e) {
         console.log('Error in admin_pt:' + e);
         errors.push('Error in admin_pt:' + e);
-        error_render(req, res, 'admin_pt');
+        error_render(req, res, 'admin_pt', plans, errors);
         return;
     }
 }
 
-async function admin_change(req,res){
+async function admin_change(req,res, plans, errors){
     try{
         let year = (req.query.year) ? parseInt(req.query.year) : null;
         let month = (req.query.month) ? parseInt(req.query.month) : null;
@@ -870,7 +920,7 @@ async function admin_change(req,res){
 
         if(!resid ||!planid) {
             errors.push('不正なアクセスです');
-            error_render(req,res,'admin_change');
+            error_render(req,res,'admin_change', plans, errors);
             return;
         }
 
@@ -921,12 +971,12 @@ async function admin_change(req,res){
     } catch(e) {
         console.log('Error in admin_change:' + e);
         errors.push('Error in admin_change:' + e);
-        error_render(req, res, 'admin_change');
+        error_render(req, res, 'admin_change', plans, errors);
         return;
     }
 }
     
-async function admin_change_complete(req,res){
+async function admin_change_complete(req,res, plans, errors){
     try{
         const resid = req.query.resid;
         const del = (req.query.del) ? parseInt(req.query.del) : 0;
@@ -939,7 +989,7 @@ async function admin_change_complete(req,res){
         
         if(!resid ||!planid) {
             errors.push('不正なアクセスです');
-            error_render(req,res,'admin_change_complete');
+            error_render(req,res,'admin_change_complete', plans, errors);
             return;
         }
 
@@ -991,17 +1041,17 @@ async function admin_change_complete(req,res){
     } catch(e) {
         console.log('Error in admin_change_complete:' + e);
         errors.push('Error in admin_change_complete:' + e);
-        error_render(req, res, 'admin_change_complete');
+        error_render(req, res, 'admin_change_complete', plans, errors);
         return;
     }
 }
 
-async function admin_user(req,res){
+async function admin_user(req,res, plans, errors){
     try{
         const planid = (req.query.id) ? parseInt(req.query.id) : 0;
         if(!planid){
             errors.push('不正なアクセスです');
-            error_render(req,res,'admin_user');
+            error_render(req,res,'admin_user', plans, errors);
             return;
         }
         const sort = (req.query.sort) ? ' ORDER BY ' + req.query.sort : ' ORDER BY UID ' ;
@@ -1033,16 +1083,16 @@ async function admin_user(req,res){
     } catch(e) {
         console.log('Error in admin_user:' + e);
         errors.push('Error in admin_user:' + e);
-        error_render(req, res, 'admin_user');
+        error_render(req, res, 'admin_user', plans, errors);
         return;
     }
 }
  
-async function admin_userchange(req,res){
+async function admin_userchange(req,res, plans, errors){
     try{
         if(!req.query.id){ 
             errors.push('不正なアクセスです');
-            error_render(req,res,'admin_userchange');
+            error_render(req,res,'admin_userchange', plans, errors);
             return;
         }
         const planid = parseInt(req.query.id);
@@ -1051,13 +1101,13 @@ async function admin_userchange(req,res){
         if(!req.query.uid){
             if(!req.query.sid){
                 errors.push('UIDもSIDも指定されていません');
-                error_render(req,res,'admin_userchange');
+                error_render(req,res,'admin_userchange', plans, errors);
                 return;
             }else{
                 ptuid = await sql.sid2uid(parseInt(req.query.sid));
                 if(ptuid < 0){//pt_usersにない
                     errors.push('PT_USERSにIDが見つかりません');
-                    error_render(req,res,'admin_userchange');
+                    error_render(req,res,'admin_userchange', plans, errors);
                     return;
                 }
             }
@@ -1084,12 +1134,12 @@ async function admin_userchange(req,res){
     } catch(e) {
         console.log('Error in admin_userchange:' + e);
         errors.push('Error in admin_userchange:' + e);
-        error_render(req, res, 'admin_userchange');
+        error_render(req, res, 'admin_userchange', plans, errors);
         return;
     }
 }
 
-async function admin_userchangecomplete(req,res){
+async function admin_userchangecomplete(req,res, plans, errors){
     try{
         const planid = (req.query.id) ? parseInt(req.query.id) : 0;
         const ptuid = (req.query.uid) ? parseInt(req.query.uid) : 0;
@@ -1103,7 +1153,7 @@ async function admin_userchangecomplete(req,res){
         
         if(ptuid === 0 || !birth) {
             errors.push('不正なアクセスです');
-            error_render(req,res,'admin_userchange_complete');
+            error_render(req,res,'admin_userchange_complete', plans, errors);
             return;
         }
 
@@ -1130,16 +1180,16 @@ async function admin_userchangecomplete(req,res){
     } catch(e) {
         console.log('Error in admin_userchangecomplete:' + e);
         errors.push('Error in admin_userchangecomplete:' + e);
-        error_render(req, res, 'admin_userchangecomplete');
+        error_render(req, res, 'admin_userchangecomplete', plans, errors);
         return;
     }
 }
 
-async function admin_vial(req,res){
+async function admin_vial(req,res, plans, errors){
     try{
         if(!req.query.id){ 
             errors.push('不正なアクセスです');
-            error_render(req,res,'admin_vial');
+            error_render(req,res,'admin_vial', plans, errors);
             return;
         }
 
@@ -1160,17 +1210,17 @@ async function admin_vial(req,res){
     } catch(e){
         console.log('Error in admin_vial:' + e);
         errors.push('Error in admin_vial:' + e);
-        error_render(req, res, 'admin_vial');
+        error_render(req, res, 'admin_vial', plans, errors);
         return;
     }
     
 }
 
-async function admin_log(req,res){
+async function admin_log(req,res, plans, errors){
     try{
         if(!req.query.id){ 
             errors.push('不正なアクセスです');
-            error_render(req,res,'admin_log');
+            error_render(req,res,'admin_log', plans, errors);
             return;
         }
         let range = (!req.query.range) ? 1 : parseInt(req.query.range);
@@ -1187,16 +1237,16 @@ async function admin_log(req,res){
     } catch(e){
         console.log('Error in admin_log:' + e);
         errors.push('Error in admin_log:' + e);
-        error_render(req, res, 'admin_log');
+        error_render(req, res, 'admin_log', plans, errors);
         return;
     }
 }
 
-async function admin_settings(req,res){
+async function admin_settings(req,res, plans, errors){
     try{
         if(!req.query.id){ 
             errors.push('不正なアクセスです');
-            error_render(req,res,'admin_settings');
+            error_render(req,res,'admin_settings', plans, errors);
             return;
         }
         if(req.query.submit){
@@ -1220,16 +1270,16 @@ async function admin_settings(req,res){
     } catch(e){
         console.log('Error in admin_settings:' + e);
         errors.push('Error in admin_settings:' + e);
-        error_render(req, res, 'admin_settings');
+        error_render(req, res, 'admin_settings', plans, errors);
         return;
     }
 }
 
-async function admin_mail(req,res){
+async function admin_mail(req,res, plans, errors){
     try{
         if(!req.query.id){ 
             errors.push('不正なアクセスです');
-            error_render(req,res,'admin_mail');
+            error_render(req,res,'admin_mail', plans, errors);
             return;
         }
                 
@@ -1249,16 +1299,16 @@ async function admin_mail(req,res){
     } catch(e){
         console.log('Error in admin_mail:' + e);
         errors.push('Error in admin_mail:' + e);
-        error_render(req, res, 'admin_mail');
+        error_render(req, res, 'admin_mail', plans, errors);
         return;
     }
 }
 
-async function admin_mail_send(req,res){
+async function admin_mail_send(req,res, plans, errors){
     try{
         if(!req.query.id){ 
             errors.push('不正なアクセスです');
-            error_render(req,res,'admin_mail_send');
+            error_render(req,res,'admin_mail_send', plans, errors);
             return;
         }
            
@@ -1299,16 +1349,16 @@ async function admin_mail_send(req,res){
     } catch(e){
         console.log('Error in admin_mail:' + e);
         errors.push('Error in admin_mail:' + e);
-        error_render(req, res, 'admin_mail');
+        error_render(req, res, 'admin_mail', plans, errors);
         return;
     }
 }
 
-async function admin_mail_list(req,res){
+async function admin_mail_list(req,res, plans, errors){
     try{
         if(!req.query.id){ 
             errors.push('不正なアクセスです');
-            error_render(req,res,'admin_mail_list');
+            error_render(req,res,'admin_mail_list', plans, errors);
             return;
         }
                 
@@ -1324,16 +1374,38 @@ async function admin_mail_list(req,res){
     } catch(e){
         console.log('Error in admin_mail_list:' + e);
         errors.push('Error in admin_mail_list:' + e);
-        error_render(req, res, 'admin_mail_list');
+        error_render(req, res, 'admin_mail_list', plans, errors);
         return;
     }
 }
 
-function error_render(req, res, module_name){
+function error_render(req, res, module_name, plans, errors){
     console.log('Error in ' + module_name);
     errors.push('Error in ' + module_name);
     res.status( 500 ); //. 500 エラー
     res.render( 'err_admin', { errors: errors, form: req.query } ); 
+}
+
+function sanitizeAdminHtml(html) {
+  return sanitizeHtml(html || '', {
+    allowedTags: [
+      'p', 'br', 'ul', 'ol', 'li',
+      'strong', 'b', 'em', 'i',
+      'u', 'small',
+      'h4', 'h5',
+      'a'
+    ],
+    allowedAttributes: {
+      a: ['href', 'target', 'rel']
+    },
+    allowedSchemes: ['http', 'https', 'mailto'],
+    transformTags: {
+      'a': sanitizeHtml.simpleTransform('a', {
+        target: '_blank',
+        rel: 'noopener noreferrer'
+      })
+    }
+  });
 }
 
 module.exports = router;

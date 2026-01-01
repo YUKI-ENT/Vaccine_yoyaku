@@ -37,7 +37,7 @@ var server = https.createServer(options, app);
  * Listen on provided port, on all network interfaces.
  */
 
-const host = Env.bind_host || "(default)";
+const host = Env.bind_host || "0.0.0.0";
 console.log(`Attaching to ${host}:${port}`);
 server.listen(port, Env.bind_host);
 

@@ -18,7 +18,7 @@
                     <dd>
                         <select name="id" id="select_year" class="form-control" >
                             <% plans.forEach(function(p){ %>
-                                <option value="<%=p.id%>" <% if(p.id == plan){ %> selected="selected" <% } %> ><%= p.year %>年度</option>
+                                <option value="<%=p.id%>" <% if(p.id == plan){ %> selected="selected" <% } %> >ID:<%= p.id %> | <%= p.year %>年度 | <%= p.name %></option>
                             <% }); %>
                         </select>
                     </dd>
@@ -36,8 +36,8 @@
                         <table class="table">
                             <tr><th  scope="col">Plan ID</th><td><input type="number" name="id" id="planid" size="4" value="<%=p.id%>" class="form-control"/></td></tr>
                             <tr><th scope="col">予約名</th> <td><input type="text" name="name" size="50" value="<%=p.name%>" class="form-control"/></td></tr>			
-                            <tr><th scope="col">説明</th> <td><textarea name="text" cols="50" rows="3" class="form-control"><%=p.text%></textarea></td></tr>
-                            <tr><th scope="col">詳細</th> <td><textarea name="detail" cols="50" rows="3" class="form-control"><%=p.detail%></textarea></td></tr>
+                            <tr><th scope="col">説明</th> <td><textarea name="text" cols="50" rows="3" class="form-control"><%- p.text%></textarea></td></tr>
+                            <tr><th scope="col">詳細</th> <td><textarea name="detail" cols="50" rows="3" class="form-control"><%-p.detail%></textarea></td></tr>
                             <tr><th scope="col">予約開始日</th> <td><input type="datetime-local" name="y_start"  value="<%=p.y_start%>" class="form-control"/></td></tr>
                             <tr><th scope="col">予約終了日</th> <td><input type="datetime-local" name="y_end"  value="<%=p.y_end%>" class="form-control"/></td></tr>
                             <tr><th scope="col">接種開始日</th><td><input type="date" name="start"  value="<%=p.start%>" class="form-control"/></td></tr>
@@ -82,7 +82,51 @@
                                         <label class="form-check-label" for="full0">新規予約受け入れ可</label>
                                     </div>
                                 </td></tr> 
-                            <tr><th scope="col"></th><td>
+
+                            <tr>
+                                <th scope="col">年齢ルール（対象年齢と回数）</th>
+                                <td>
+                                    <p class="text-muted mb-2">
+                                    年齢は「月齢」で指定（例：13歳=156）。上限なしの場合は <strong>9999</strong> を入力してください。対象外の場合はこの範囲に入らないため予約不可になります。
+                                    </p>
+
+                                    <table class="table table-sm">
+                                        <thead>
+                                            <tr>
+                                            <th style="width:10%">優先</th>
+                                            <th style="width:20%">最小(月)</th>
+                                            <th style="width:20%">最大(月)</th>
+                                            <th style="width:15%">回数</th>
+                                            <th>メモ</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <% const rlist = (typeof rules !== 'undefined' && rules && rules.length) ? rules : []; %>
+
+                                            <% for (let i = 0; i < 3; i++) { %>
+                                            <% const r = rlist[i] || { id:'', sort:i+1, min_age_m:'', max_age_m:'', required_doses:'', note:'' }; %>
+                                            <tr>
+                                                <td>
+                                                <input type="hidden" name="rule_id[]" value="<%= r.id %>">
+                                                <input type="number" name="rule_sort[]" value="<%= r.sort %>" class="form-control">
+                                                </td>
+                                                <td><input type="number" name="rule_min_age_m[]" value="<%= r.min_age_m %>" class="form-control"></td>
+                                                <td><input type="number" name="rule_max_age_m[]" value="<%= r.max_age_m %>" class="form-control"></td>
+                                                <td><input type="number" name="rule_required_doses[]" value="<%= r.required_doses %>" class="form-control"></td>
+                                                <td><input type="text" name="rule_note[]" value="<%= r.note %>" class="form-control"></td>
+                                            </tr>
+                                            <% } %>
+                                        </tbody>
+                                    </table>
+
+                                    <p class="text-muted mb-0">
+                                    空欄の行は無視されます（min/max/回数が揃っている行だけ保存）。
+                                    </p>
+                                </td>
+                            </tr>
+
+                            <tr><th scope="col"></th>
+                                <td>
                                 <input type="submit" name="add" id="btnadd" value="コピーして新規追加" class="btn btn-primary"/>
                                 <input type="submit" name="edit" id="btnedit" value="更新" class="btn btn-primary"/>
                                 <input type="reset"  value="元に戻す" class="btn btn-info"/>

@@ -33,10 +33,10 @@ passport.use(new LocalStrategy({
   usernameField: 'sid',
   passwordField: 'birth',
   passReqToCallback: true,
-  session: false,
+  // session: false,
 }, async function (req, sid, birth, done) {
     try{
-      if(sid.match('/^\d{2,5}$/') || moment(birth).isValid()){
+      if (/^\d{2,5}$/.test(String(sid)) && moment(birth, ['YYYY-MM-DD','YYYY/MM/DD','YYYYMMDD'], true).isValid()) {
         let input_birth = moment(birth).format('YYYY-MM-DD');
         let ptinfo = await sql.sid2ptinfo(sid); //PT_master検索
         if(ptinfo != null){
@@ -91,40 +91,81 @@ router.use(passport.session());
 
 /* GET home page. */
 router.get(Env.https_path, isAuthenticated, Validator,  async function(req, res, next) { //ログイン後
-  let errors = [];
-  try{
-    const ValidationErrors = validationResult(req);
-    if (!ValidationErrors.isEmpty()) {
-      console.log('Validation error.');
-      ValidationErrors.array().forEach(e => {
-        errors.push(e.msg);
-      });
-      error_render(req,res,'Validation',errors);
-      return;
+    let errors = [];
+    try{
+      const ValidationErrors = validationResult(req);
+      if (!ValidationErrors.isEmpty()) {
+        console.log('Validation error.');
+        ValidationErrors.array().forEach(e => {
+          errors.push(e.msg);
+        });
+        error_render(req,res,'Validation',errors);
+        return;
+      }
+    
+      // Userdata(pt_usersから)を暗号化してcookieに保存する（壊れてたら作り直す）
+    let userdata = null;
+
+    // 1) cookieがあれば復号してみる（失敗したら破棄）
+    if (req.cookies && req.cookies.USERINFOS) {
+      try {
+        const dec = crypt.getDecryptedString(req.cookies.USERINFOS);
+        userdata = JSON.parse(dec);
+
+        // 最低限の妥当性チェック（足りなければ無効扱い）
+        if (!userdata || typeof userdata !== 'object' || !userdata.UID || !userdata.FID) {
+          userdata = null;
+          res.clearCookie('USERINFOS');
+        }
+      } catch (e) {
+        // 復号失敗＝壊れた/改ざんの可能性 → 破棄して作り直す
+        userdata = null;
+        res.clearCookie('USERINFOS');
+      }
     }
 
-    let plans = [];
-    
-    //Userdata(pt_usersから)を暗号化してcookieに保存する
-    let userdata = {};
-    if(!req.cookies.USERINFOS){
-      //sid -> pt_users
+    // 2) cookieが無い/無効なら DB から作る
+    if (!userdata) {
+      // sid -> pt_users
       userdata = await sql.sid2ptusers(req.user);
-      if(!userdata){ // 初めてのログイン set_ptusersでuid登録
+
+      if (!userdata) { // 初めてのログイン set_ptusersでuid登録
         console.log("Registering new uid, fid for SID:" + req.user);
 
         const newuser = await sql.set_ptusers(req.user);
-        sql.set_log(req,newuser.SID, '新規UID登録');
+        sql.set_log(req, newuser.SID, '新規UID登録');
 
+        // uid2ptinfo が返す形に合わせる（既存コード踏襲）
         userdata = await sql.uid2ptinfo(newuser.UID);
-        console.log(userdata);
       }
-      const enc_data = crypt.getEncryptedString(JSON.stringify(userdata));
-      res.cookie('USERINFOS',enc_data);
-      console.log('Set USERINFOS');
-    } else {
-      //cookieから復号
-      userdata = JSON.parse(crypt.getDecryptedString(req.cookies.USERINFOS));
+
+      // 3) cookieに保存する内容は「必要最小限」に絞る（巨大化・漏えいリスクを減らす）
+      const cookieUser = {
+        SID: userdata.SID ?? req.user,
+        UID: userdata.UID,
+        FID: userdata.FID,
+        // 表示に必要なら
+        name1: userdata.name1,
+        name2: userdata.name2,
+        birth: userdata.birth,   // もし持ってるなら
+        // 必要なら他も追加。ただし増やしすぎない
+      };
+
+      try {
+        const enc = crypt.getEncryptedString(JSON.stringify(cookieUser));
+        // セキュリティ寄りのCookie属性（https運用前提）
+        res.cookie('USERINFOS', enc, {
+          httpOnly: true,
+          secure: true,          // httpsのみで送る
+          sameSite: 'lax',
+          // maxAgeは運用に合わせて（例：30日）
+          maxAge: 1000 * 60 * 60 * 24 * 30
+        });
+        console.log('Set USERINFOS');
+      } catch (e) {
+        // cookie保存に失敗しても致命ではないので、ログだけ
+        console.log('Failed to set USERINFOS cookie:', e);
+      }
     }
 
     let fid = userdata.FID;
@@ -132,89 +173,86 @@ router.get(Env.https_path, isAuthenticated, Validator,  async function(req, res,
 
     const mode = (req.query.mode) ? req.query.mode : 'plan';
 
-    switch(mode){
+    let plans = await sql.getActivePlans();
+
+    switch (mode) {
       case 'familyedit':
-        familyedit(req, res, fid);
-        break;
+        return familyedit(req, res, fid);
+
       case 'familydelconf':
-        familydelconf(req,res);
-        break;
+        return familydelconf(req, res);
+
       case 'familydel':
-        familydel(req,res);
-        break;
+        return familydel(req, res);
+
       case 'familyaddconf':
-        familyaddconf(req, res);
-        break;
+        return familyaddconf(req, res);
+
       case 'familyadd':
-        familyadd(req,res);
-        break;
+        return familyadd(req, res);
+
       case 'reservenew':
-        reserve_new_select(req,res);
-        break;
+        return reserve_new_select(req, res);
+
       case 'reservenewcal':
-        reserve_new_cal(req, res);
-        break;
+        return reserve_new_cal(req, res);
+
       case 'reservenewconf':
-        reserve_new_conf(req,res);
-        break;
+        return reserve_new_conf(req, res);
+
       case 'reservenewcomplete':
-        reserve_new_complete(req,res);
-        break;
+        return reserve_new_complete(req, res);
+
       case 'reservechange':
-        reserve_change(req,res);
-        break;
+        return reserve_change(req, res);
+
       case 'reserveedit':
-        reserve_edit(req,res);
-        break;
+        return reserve_edit(req, res);
+
       case 'reserveeditconf':
-        reserve_edit_conf(req,res);
-        break;
+        return reserve_edit_conf(req, res);
+
       case 'reserveeditcomplete':
-        reserve_edit_complete(req,res);
-        break;
+        return reserve_edit_complete(req, res);
+
       case 'reservedel':
-        reserve_del_complete(req,res);
-        break;
+        return reserve_del_complete(req, res);
+
       case 'mailform':
-        mail_form(req,res);
-        break;
+        return mail_form(req, res);
+
       case 'mailregist':
-        mail_regist(req,res);
-        break;
+        return mail_regist(req, res);
+
       case 'maildelete':
-        mail_delete(req,res);
-        break;
+        return mail_delete(req, res);
+
       case 'mailauth':
-        mail_auth(req,res);
-        break;
-      default: //plan
-        plans = await sql.getActivePlans();
-        
-        if(plans.length == 0){ //planなし
-          res.render('no_plans', { 
-            user : req.user,
-            ptinfo: userdata,
-            Env: Env,
-            errors: errors
-          });  
-        } else { //planあり
-          // 最初のPlanを既定とする
-          const vialml = await sql.getReservedVialMl(plans[0].id, plans[0]);
-          if(vialml.total_vial >= plans[0].vial){
-            errors.push("現在予約が満員になっています。キャンセルや端数のある日のみ予約可能となっています。");
-          } else if(vialml.total_vial + 10>= plans[0].vial){
-            errors.push("現在予約残枠が少なくなっています。多人数予約で空き枠が表示されない場合は、人数を減らして予約してみてください。");
+        return mail_auth(req, res);
+
+      default: { // plan
+        for (const p of plans) {
+          const vialml = await sql.getReservedVialMl(p.id, p);
+
+          p.vialml = vialml; // デバッグ用
+          p.warn = null;
+
+          if (vialml && vialml.total_vial >= p.vial) {
+            p.warn = '現在予約が満員です。キャンセルや端数のある日のみ予約可能です。';
+          } else if (vialml && vialml.total_vial + 10 >= p.vial) {
+            p.warn = '現在予約残枠が少ないです。多人数予約で空き枠が出ない場合は人数を減らして試してください。';
           }
-          res.render('plans', { 
-            user : req.user,
-            ptinfo: userdata,
-            Env: Env,
-            plans: plans,
-            errors: errors
-          });
         }
+
+        return res.render('plans', {
+          user: req.user,
+          ptinfo: userdata,
+          Env: Env,
+          plans: plans,   // 0件でもOK
+          errors: errors
+        });
+      }
     }
-    
   } catch(e) {
     console.log('/ error.');
     errors.push(e);
@@ -656,277 +694,6 @@ async function reserve_new_select(req,res){
     error_render(req,res,'reserve_new_select',errors);
   }
 }
-
-/*
-async function reserve_new_cal(req, res, edit = 0,reserved_ids = []){ //変更モードと新規モード兼用
-  //変更モードで起動:edit=1
-  let errors = [];
-  try{
-    let families = [], resinfos = [], required_ml = {}, required_vials ={}, vac_list=[];
-    let num, full; 
-    let args = [],ptuids = [];
-    moment.locale('ja');
-    const userdata = getUserinfos(req);
-
-    //引数チェック
-    args = (edit === 0) ? ['plan','ptuids'] : ['plan','resids'];
-    if(check_args(req.query,args).length > 0)  {
-        errors.push('予約操作を行う人が選択されていません。元のページにもどって、選択しなおして下さい');
-        error_render(req,res,'reserve_new_cal',errors);
-        return;
-    }
-    if(!userdata){
-      errors.push('不正なアクセスです。トップページから操作し直してみてください。');
-      error_render(req,res,'reserve_edit',errors);
-      return;
-    }
-    const fid = userdata.FID;
-    
-    const planid = parseInt(req.query.plan);
-    let plandata = await sql.getPlan(planid);
-    if(!plandata){
-      errors.push('指定の予防接種枠が存在しません。もう一度トップページから操作し直してください。');
-      error_render(req,res,'reserve_new_cal',errors);
-      return;
-    }
-    
-    //表示年月日取得
-    let year = moment(plandata.start).year();
-    let month = moment(plandata.start).month() + 1;
-    let day = 1;
-    if(req.query.yearmonth){
-      let ym = req.query.yearmonth.split('-');
-      year = parseInt(ym[0]);
-      month = parseInt(ym[1]);
-    }
-    //表示年設定
-    let yearmonths = [];
-    for(let y=moment().startOf('month');y.isSameOrBefore(moment(plandata.end));y.add(1,'months')){
-      let flag = (y.year() === year && y.month()+1 === month) ? true : false;
-      yearmonths.push({id: y.format('YYYY-MM'), name: y.format('YYYY年M月'), flag: flag});
-    }
-
-    //Vaccine list
-    vac_list = await sql.getVaccineList(planid);
-
-    //新規：ptuids -> families、変更：resids-> resinfo //required_ml[vac_id]
-    if(edit === 0) {
-      ptuids = req.query.ptuids ;
-      //UIDから患者名取得
-      // 家族情報取得
-      for(let ptuid of ptuids){
-        let ptinfo= await sql.uid2ptinfo(ptuid);
-        //vac名取得
-        let vac_field = 'vac' + ptuid;
-        if(!req.query[vac_field]) {
-          errors.push(ptinfo.name1 + ptinfo.name2 +'様のワクチンを選択してください。');
-        } else {
-          let vac_ids = req.query[vac_field];
-          let vac_infos =[];
-          for(let vac_id of vac_ids){
-            let vac_info = vac_list.find((v)=> v.vac_id === parseInt(vac_id));
-            vac_infos.push(vac_info);
-            //3回以上の予約でないかチェック:新規予約のみ
-            let reservecount = await sql.getReserveCount(ptuid,planid,vac_id);
-            if(reservecount >= parseInt(vac_info.vac_times)) errors.push(ptinfo.name1 + ptinfo.name2 + '様：' + vac_info.vac_name + 'ワクチンの予約が既に2回入っています。3回以上の予約はできません。');
-            //必要量計算
-            required_ml[vac_id] += parseFloat(vac_info.std_dose);
-          }
-          families.push({
-            'uid'  : ptuid,
-            'name' : ptinfo.name1 + ptinfo.name2,
-            'vac_infos': vac_infos
-          });
-        }
-      }// for ptuids
-      //人数必要バイアル数
-      num = ptuids.length; //人数が正しく取得できるか要確認
-      for(let vaccine of vac_list){
-        required_vials[vaccine.vac_id] = (!required_ml[vaccine.vac_id]) ? 0 : Math.ceil(required_ml[vaccine.vac_id] / vaccine.mlpervial);
-      }
-    } else { //更新モード
-      if(reserved_ids.length === 0) reserved_ids = req.query.resids;
-      num = reserved_ids.length;
-      newvials = 0;
-      //予約情報取得
-      for(let resid of reserved_ids){
-        let resinfo = await sql.getReserveInfo(resid,fid);
-        resinfo.j_date = moment(resinfo.PT_date).format('YYYY年M月D日(dddd)');
-        ptuids.push(resinfo.UID);
-        resinfos.push(resinfo);
-      }
-      //同一ptuid(1,2回目同時)の変更はエラー
-      if(ptuids.length !== Array.from(new Set(ptuids)).length){
-        errors.push('同一人物を同時に変更することはできません。接種回数ごとに変更操作を行ってください。');
-      }
-    }
-    if(num < 1 ) errors.push('接種する人が選択されていません。元のページにもどって、選択しなおして下さい');
-    if(errors.length > 0){
-      error_render(req,res,'reserve_new_cal',errors);
-      return;
-    }
-
-    //available number: avn[vac_id] 
-    //各ワクチンごとに日毎の①予約ml、②枠ml取得、
-    //fullなら予約ml/mlpervialの剰余が出る日のみ剰余/std_dose分枠作成。
-
-    //予約済人数取得枠取得
-    const respromise = sql.getReservedNumber(planid, year, month);
-    const wakupromise = sql.getWaku(planid,year,month);
-    const vialmlpromise = sql.getReservedVialMl(planid, plandata);
-    const resnumbers = await respromise;
-    const wakus = await wakupromise;
-    const vialml = await vialmlpromise;
-
-    //ワクチン残量取得、バイアル総数：バイアル総数が既定値に達するようなら、端数モードに vialml{'YYYY-MM-DD':{ml:, vial:},,,total_vial:,full:} シリンジモード total_vialとfullだけを返す
-    if(vialml.total_vial + newvials > parseInt(plandata.vial)) full = true;
-    //祝日取得
-    const holidays = require('../holidays.json');
-
-    //カレンダ作成
-    let w = moment([year,month-1,1]).day();
-    let lastdate = moment([year,month-1,1]).daysInMonth();
-    let calenders = [], zns = [];
-    let type = '', count = 0, av=false;
-    let applydate = moment().add(parseInt(plandata.apply),'days');
-    
-    for (let i = 0; i < 42; i++) {
-      av = false;
-      zns = [];  //set default
-
-      if (i === w) { //最初の日
-        type = 'day';
-      } else if (day > lastdate) {
-        type = '';
-      }
-      if (i === 35 && !type) break;
-      if (type && i % 7 == 1) count++;
-      if (type && i % 7 == 0) {
-        type = 'sunday';
-      } else if (type && i % 7 == 6) {
-        type = 'satday';
-      } else if (type) {
-        type = 'day';
-      }
-  
-      if (type) {
-        //祝日
-        if(String(year) in holidays && holidays[String(year)].indexOf(('00' + month).slice(-2) + ('00' + day).slice(-2)) >= 0){
-          type = 'sunday';
-        } 
-      
-        //残数取得
-        let date = moment([year, month-1, day]).endOf('days');
-        //端数モード
-        if ((full) && (syringe === 0)) {
-          if(date.isAfter(applydate) && type){ //稼働日
-            let zanryou = 0;
-            strdate = date.format('YYYY-MM-DD');
-            if(vialml[strdate]){
-              zanryou =  vialml[strdate].vial * parseFloat(plandata.mlpervial) - vialml[strdate].ml;
-            } 
-
-            if (zanryou >= parseFloat(plandata.std_dose)) { //端数ある日
-              let daylimit = Math.floor(zanryou/parseFloat(plandata.std_dose)) - num;
-              //枠チェック
-              if(wakus[day]){
-                wakus[day].forEach(function(waku){ //nullの0うめ必要
-                  let resdata = (resnumbers[day]) ? resnumbers[day].find((r) => r.zoneid === waku.zoneid) : null;
-                  let resnum = (resdata) ? resdata.num : 0;
-                  let aki = waku.num - resnum - num;
-                  aki = Math.min(aki, daylimit);
-                  zns.push({
-                    zoneid: waku.zoneid,
-                    zonename: waku.zonename,
-                    num: aki
-                  });
-                  if(aki >= 0) av = true;
-                }); //forEach
-              } //wakus
-            } //残量あり
-          } //稼働日
-        } else if((full) && (syringe === 1) && (date.isAfter(applydate))){ //シリンジモードで満員のとき
-          //シリンジモードで変更の時は、枠の範囲で自由に変更できるように
-          if(edit === 1){
-            if(wakus[day]){
-              wakus[day].forEach(function(waku){ //nullの0うめ必要
-                let resdata = (resnumbers[day]) ? resnumbers[day].find((r) => r.zoneid === waku.zoneid) : null;
-                let resnum = (resdata) ? resdata.num : 0;
-                let aki = waku.num - resnum ;
-                zns.push({
-                  zoneid: waku.zoneid,
-                  zonename: waku.zonename,
-                  num: aki
-                });
-                if(aki >= 0) av = true;
-              }); //forEach
-            } //wakus
-          }
-        } else if((date.isAfter(applydate) && type)) { //残ワクチンがある場合 接種人数と残量の計算が必要？
-          //枠チェック
-          if(wakus[day]){
-            wakus[day].forEach(function(waku){ //nullの0うめ必要
-              let resdata = (resnumbers[day]) ? resnumbers[day].find((r) => r.zoneid === waku.zoneid) : null;
-              let resnum = (resdata) ? resdata.num : 0;
-              let aki = waku.num - resnum ;
-              zns.push({
-                zoneid: waku.zoneid,
-                zonename: waku.zonename,
-                num: aki
-              });
-              if(aki >= 0) av = true;
-            }); //forEach
-          } //wakus
-        }
-        calenders.push({
-          'day'       : day,
-          'type'      : type,
-          'available' : av,
-          'zns'       : zns
-        });
-        day++;
-      } else { // type
-        calenders.push({
-          'day'       : 0,
-          'type'      : '',
-          'available' : false,
-          'zns'       : null
-        });
-      }
-    } // for 
-
-    let form={
-      plan: planid,
-      num: num,
-      year: year,
-      month: month,
-      day: day
-    };
-
-    let template = (edit === 0) ? 'reserve_new_cal' : 'reserve_edit_cal';
-    if(errors.length > 0){
-      error_render(req,res,'reserve_new_cal',errors);
-      return; 
-    } else { 
-      res.render(template, { 
-        Env: Env,
-        errors: errors,
-        plan: plandata,
-        families: families,
-        resinfos: resinfos,
-        resids: reserved_ids,
-        ptuids: ptuids,
-        form:  form,
-        yearmonths: yearmonths,
-        calenders: calenders
-      });
-    } 
-  } catch(e) {
-    errors.push(e);
-    error_render(req,res,'reserve_new_cal',errors);
-  }
-}
-*/
 
 async function reserve_new_cal(req, res, edit = 0,reserved_ids = []){ //変更モードと新規モード兼用
   //変更モードで起動:edit=1

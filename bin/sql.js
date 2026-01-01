@@ -232,7 +232,7 @@ async function getActivePlans() { //stat = 1, <=y_end で抽出、arrayでreturn
 
 async function getAllPlans() {
   try {
-    const q = 'SELECT * FROM ' + Db.T_plans + ' ORDER by `year` DESC';
+    const q = 'SELECT * FROM ' + Db.T_plans + ' ORDER by `id` DESC';
     const [rows] = await pool.query(q);
     let plans = [];
 
@@ -280,40 +280,58 @@ async function getReservedNumber(planid, year, month, day=0) { // num{day:[{zone
   let num = {}, ret = {}; //day=0ならその月の全データ、day>0ならその日のみ
   try {
     const zones = await getZones(planid);
-    
-    let q = `SELECT PT_date, PT_zone, Del, ${Db.T_reserve}.plan, ${Db.T_zones}.name as zonename, Count(${Db.T_reserve}.ID) AS PT_num 
-           FROM ${Db.T_reserve} LEFT JOIN ${Db.T_zones} ON PT_zone = ${Db.T_zones}.id  GROUP BY PT_date, PT_zone, Del, ${Db.T_reserve}.plan 
-           HAVING ((Del = 0) AND (${Db.T_reserve}.plan = ?) AND( PT_date LIKE ?)) ORDER BY PT_date, PT_zone`;
-    let d =  (day ===0 )? moment([year, month - 1, 1]).format('YYYY-MM-%') : moment([year, month - 1, day]).format('YYYY-MM-DD');
-    let [rows, fields] = await pool.query(q, [planid, d]);
 
-    rows.forEach(function (row) {
-      let date = moment(row.PT_date).date();
+    const d = (day === 0)
+      ? moment([year, month - 1, 1]).format('YYYY-MM-%')
+      : moment([year, month - 1, day]).format('YYYY-MM-DD');
+
+    const q = `
+      SELECT
+        DATE_FORMAT(r.PT_date, '%Y-%m-%d') AS day,
+        r.PT_zone AS zoneid,
+        z.name AS zonename,
+        COUNT(r.ID) AS PT_num
+      FROM ${Db.T_reserve} r
+      LEFT JOIN ${Db.T_zones} z
+        ON r.PT_zone = z.id
+       AND z.plan = r.plan
+      WHERE
+        r.Del = 0
+        AND r.plan = ?
+        AND DATE_FORMAT(r.PT_date, '%Y-%m-%d') LIKE ?
+      GROUP BY day, zoneid, zonename
+      ORDER BY day, zoneid
+    `;
+
+    const [rows] = await pool.query(q, [planid, d]);
+
+    rows.forEach(row => {
+      const date = moment(row.day, 'YYYY-MM-DD').date(); // 1..31（今の仕様に合わせる）
       if (!num[date]) num[date] = [];
-      num[date].push({ zoneid: parseInt(row.PT_zone), zonename: row.zonename, num: parseInt(row.PT_num) });
+      num[date].push({
+        zoneid: parseInt(row.zoneid, 10),
+        zonename: row.zonename,
+        num: parseInt(row.PT_num, 10),
+      });
     });
-    
-    //予約数0のゾーンデータを追加
-    for(let k in num){
+
+    // 予約数0のゾーンも埋める
+    for (const k in num) {
       ret[k] = [];
-      zones.forEach(function(zone){
-        let result = num[k].find((u) => u.zoneid === parseInt(zone.id));
-        if(!result) {
-            ret[k].push({
-                zoneid: parseInt(zone.id),
-                zonename: zone.name,
-                num: 0
-            });
-        } else {
-            ret[k].push(result);
-        }
+      zones.forEach(zone => {
+        const found = num[k].find(u => u.zoneid === parseInt(zone.id, 10));
+        ret[k].push(found ?? {
+          zoneid: parseInt(zone.id, 10),
+          zonename: zone.name,
+          num: 0
+        });
       });
     }
+
+    return ret;
   } catch (e) {
     console.log('Error in getReservedNumber :' + e);
-    ret = null;
-  } finally {
-    return ret;
+    return null;
   }
 }
 
@@ -393,19 +411,16 @@ async function getRequiredMl(plandata,moment_date,ptuids){
   } 
 }
 
-async function getReserveCount(ptuid, planid, vac_id = 0) {  //予約済み予約数を返す。過去の予約はカウントしない3回以上の予約確認チェック用
+async function getReserveCount(ptuid, planid) {  //予約済み予約数を返す。過去の予約はカウントしない3回以上の予約確認チェック用
   // vac_idを指定しなければ、予約日ベースでのカウント数。指定すれば、指定ワクチンのみのカウント数
   try {
-    if(vac_id === 0){
-      let sql = `SELECT COUNT(ID) as num FROM ${Db.T_reserve} WHERE ((Del = 0) AND (UID = ?) AND (plan = ?) AND (PT_date >= NOW()))`;
-    } else {
-      let sql = `SELECT COUNT(ID) as num FROM  ${Db.T_reserve} LEFT JOIN ${Db.T_reserved_vaccines} 
-                  ON ${Db.T_reserve}.ID = ${Db.T_reserved_vaccines}.resid 
-                  WHERE ((Del = 0) AND (UID = ?) AND (plan = ?) AND (PT_date >= NOW()))`;
-    }
-    let [result] = await pool.query(sql, [ptuid, planid]);
+    let sqlText = `SELECT COUNT(ID) as num
+                 FROM ${Db.T_reserve}
+                 WHERE (Del = 0) AND (UID = ?) AND (plan = ?) AND (PT_date >= CURDATE())`;
+    const [result] = await pool.query(sqlText, [ptuid, planid]);
     return result[0].num;
-  } catch (e) {
+  }
+  catch (e) {
     console.log('Error in getReserveCount : ' + e);
     return -1;
   }
@@ -725,6 +740,50 @@ function formatDate(date, format) {// yyyy-M-d H:m:s.S
   return format;
 };
 
+async function getPlanRules(planId) {
+  const q = `
+    SELECT id, min_age_m, max_age_m, required_doses, sort, note
+    FROM reserve_plan_rules
+    WHERE plan_id = ?
+    ORDER BY sort ASC
+  `;
+  const [rows] = await pool.query(q, [planId]);
+  return rows;
+}
+
+async function replacePlanRules(planId, rules) {
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    await conn.query('DELETE FROM reserve_plan_rules WHERE plan_id = ?', [planId]);
+
+    const insertQ = `
+      INSERT INTO reserve_plan_rules (plan_id, min_age_m, max_age_m, required_doses, sort, note)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `;
+
+    for (const r of rules) {
+      await conn.query(insertQ, [
+        planId,
+        r.min_age_m,
+        r.max_age_m,
+        r.required_doses,
+        r.sort,
+        r.note ?? null
+      ]);
+    }
+
+    await conn.commit();
+    return true;
+  } catch (e) {
+    await conn.rollback();
+    throw e;
+  } finally {
+    conn.release();
+  }
+}
+
 module.exports.pool = pool;
 module.exports.getLoginFailureCount = getLoginFailureCount;
 module.exports.sid2ptinfo = sid2ptinfo;
@@ -758,3 +817,5 @@ module.exports.get_vials = get_vials;
 module.exports.getSettings = getSettings;
 module.exports.setSettings = setSettings;
 module.exports.getRequiredMl = getRequiredMl;
+module.exports.getPlanRules = getPlanRules;
+module.exports.replacePlanRules = replacePlanRules;
