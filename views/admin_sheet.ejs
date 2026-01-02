@@ -7,19 +7,7 @@
                 <li class="text-danger"><%=error %></li>
             <% }); %>
         </ul>
-        <form action="<%= Env.admin %>" method="get">
-            <input type="hidden" name="mode" value="sheet" />
-                <dl>
-                    <dt>年度情報</dt>
-                    <dd>
-                        <select name="id" id="select_year" class="form-control" >
-                            <% plans.forEach(function(p){ %>
-                                <option value="<%=p.id%>" <% if(p.id == plan){ %> selected="selected" <% } %> ><%= p.year %>年度</option>
-                            <% }); %>
-                        </select>
-                    </dd>
-                </dl>
-        </form>
+        <%- include('./admin_selectplans.ejs', {Env,form, plans,plan}); %>
         
 	    <h2>予約一覧</h2>
             <% if(total === 0){ %>

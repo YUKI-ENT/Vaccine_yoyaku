@@ -1,97 +1,201 @@
 <%- include('./header.ejs', {Env: Env}); %>
 <body>
-    <%- include('./navbar.ejs', {Env: Env}); %>
-    
+  <%- include('./navbar.ejs', {Env: Env}); %>
 
-<div id="container" class="container">
-		<nav aria-label="パンくずリスト">
-			<ol class="breadcrumb">
-				<li class="breadcrumb-item"><a href="<%= Env.https_path %>">ホーム</a></li>
-				<li class="breadcrumb-item">予約の確認・変更・キャンセル</li>
-                <li class="breadcrumb-item active" aria-current="page">予約日変更(日付選択)</li>
-			</ol>
-		</nav>
-	<div class="jumbotron">
-	<h2>変更日時の選択</h2>
-        変更人数: <strong><%= form.num%></strong>人
-        <table class="table">
-            <tr><th>氏名</th><th>変更前の予約日時</th></tr>
-            <% resinfos.forEach(function(r){ %>
-                <tr><td><%=r.PT_name%>様</td><td><%=r.j_date%><%=r.zonename%></td></tr>
-            <% }); %>
-        </table>
-		<ul>
-            
-            <li>変更したい日付、時間帯を選択してください。</li>
-    	</ul>
-	<form action="<%= Env.https_path %>" method="get">
-        <input type="hidden" name="mode" value="reserveedit" />
-        <input type="hidden" name="change_act" value="1" />
-        <input type="hidden" name="plan" value="<%= form.plan%>" />
-        <input type="hidden" name="num" value="<%= form.num%>" />
-        <% resids.forEach(function(resid){ %>
-            <input type="hidden" name="resids[]" value="<%= resid%>" />
-        <% }); %>
-        <div class="form-inline">
-            <select name="yearmonth"  id="select_year"  class="form-control" >
-            <% yearmonths.forEach(function(ym){ %>
-                <option value="<%= ym.id %>"<% if(ym.flag){ %> selected="selected"<% } %>><%= ym.name %></option>
-            <% }); %>
-            </select>
+  <div id="container" class="container">
+    <nav aria-label="パンくずリスト">
+      <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="<%= Env.https_path %>">ホーム</a></li>
+        <li class="breadcrumb-item">予約の確認・変更・キャンセル</li>
+        <li class="breadcrumb-item active" aria-current="page">予約日変更(日付選択)</li>
+      </ol>
+    </nav>
+
+    <div class="jumbotron py-4">
+      <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-md-between">
+        <div>
+          <h2 class="mb-1">変更日時の選択</h2>
+          
         </div>
-	</form>
-	<h3><%= form.year %>年<%= form.month %>月の空き状況</h3>
-	<table summary="利用日一覧" class="table table-bordered table-responsive-sm">
-		<tr>
-			<th class="table-danger">日</th>
-			<th class="table-light">月</th>
-			<th class="table-light">火</th>
-			<th class="table-light">水</th>
-			<th class="table-light">木</th>
-			<th class="table-light">金</th>
-			<th class="table-primary">土</th>
-		</tr>
-        <% calenders.forEach(function(calender, index){ %>
-		    <% if(index % 7 == 0){ %>
-			    <tr>
+      </div>
+
+	  <%- include('./plan_title.ejs', { plan: plan }); %>
+
+
+      <!-- エラー表示（errorsを渡している場合だけ出る） -->
+      <% if (typeof errors !== 'undefined' && errors && errors.length) { %>
+        <div class="alert alert-danger mt-3 mb-3" role="alert">
+          <ul class="mb-0">
+            <% errors.forEach(function(err){ %>
+              <li><%= err %></li>
+            <% }); %>
+          </ul>
+        </div>
+      <% } %>
+
+      <!-- 変更概要 -->
+      <div class="card mt-3 shadow-sm">
+        <div class="card-body">
+          <div class="row">
+            <div class="col-md-4 mb-3 mb-md-0">
+              <h5 class="mb-2">変更人数</h5>
+              <p class="mb-1">
+                <span class="badge badge-primary p-2" style="font-size: 1rem;">
+                  <%= form.num %> 人
+                </span>
+              </p>
+              <p class="mb-0 text-muted">変更対象の予約を確認してください。</p>
+            </div>
+
+            <div class="col-md-8">
+              <h5 class="mb-2">変更前の予約</h5>
+              <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                  <thead>
+                    <tr>
+                      <th>氏名</th>
+                      <th>変更前の予約日時</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <% resinfos.forEach(function(r){ %>
+                      <tr>
+                        <td><%= r.PT_name %> 様</td>
+                        <td><%= r.j_date %> <%= r.zonename %></td>
+                      </tr>
+                    <% }); %>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <hr class="my-3">
+
+          <p class="mb-2">
+            変更したい<strong>日付</strong>と<strong>時間帯</strong>を選択してください。
+          </p>
+
+          <!-- 月選択フォーム（選択したらGETで同ページ再表示） -->
+          <form action="<%= Env.https_path %>" method="get" class="form-inline">
+            <input type="hidden" name="mode" value="reserveedit" />
+            <input type="hidden" name="change_act" value="1" />
+            <input type="hidden" name="plan" value="<%= form.plan %>" />
+            <input type="hidden" name="num" value="<%= form.num %>" />
+            <% resids.forEach(function(resid){ %>
+              <input type="hidden" name="resids[]" value="<%= resid %>" />
+            <% }); %>
+
+            <label for="select_year" class="mr-2 mb-2 mb-sm-0">表示月</label>
+            <select name="yearmonth" id="select_year" class="form-control mr-2">
+              <% yearmonths.forEach(function(ym){ %>
+                <option value="<%= ym.id %>" <% if(ym.flag){ %> selected="selected"<% } %>><%= ym.name %></option>
+              <% }); %>
+            </select>
+            <button type="submit" class="btn btn-outline-primary">表示</button>
+          </form>
+
+          <div class="mt-3">
+            <h4 class="mb-0"><%= form.year %>年<%= form.month %>月の空き状況</h4>
+            <small class="text-muted">○：変更可能 / ×：変更不可</small>
+          </div>
+        </div>
+      </div>
+
+      <!-- カレンダー -->
+      <div class="table-responsive mt-4">
+        <table summary="利用日一覧" class="table table-bordered">
+          <thead>
+            <tr>
+              <th class="table-danger text-center" style="width:14%;">日</th>
+              <th class="table-light text-center" style="width:14%;">月</th>
+              <th class="table-light text-center" style="width:14%;">火</th>
+              <th class="table-light text-center" style="width:14%;">水</th>
+              <th class="table-light text-center" style="width:14%;">木</th>
+              <th class="table-light text-center" style="width:14%;">金</th>
+              <th class="table-primary text-center" style="width:14%;">土</th>
+            </tr>
+          </thead>
+
+          <tbody>
+          <% calenders.forEach(function(calender, index){ %>
+            <% if(index % 7 == 0){ %>
+              <tr>
             <% } %>
-			<% if(calender.type == ''){ %>
-    			<td>-</td>
+
+            <% if(calender.type == ''){ %>
+              <td class="text-center text-muted">-</td>
             <% } else { %>
-				<% if(calender.type == 'day'){ %>
-					<td class="table-light">
-				<% } else if(calender.type == 'satday') { %>
-					<td  class="table-primary">
-				<% } else if(calender.type == 'sunday') { %>
-					<td  class="table-danger">
-				<% } %>
+              <% if(calender.type == 'day'){ %>
+                <td class="table-light align-top">
+              <% } else if(calender.type == 'satday') { %>
+                <td class="table-primary align-top">
+              <% } else if(calender.type == 'sunday') { %>
+                <td class="table-danger align-top">
+              <% } %>
 
-				<%= calender.day%><br/>
-				<% if(calender.available == false) { %>×
-				<% } else { %> 
-					<% calender.zns.forEach(function(zn){ %>
-						<% if(zn.num >= 0){ %>
-							<a href="<%= Env.https_path %>?mode=reserveeditconf&amp;plan=<%= form.plan%>&amp;year=<%= form.year%>&amp;month=<%= form.month%>&amp;day=<%= calender.day%>&amp;num=<%= form.num%>&amp;zoneid=<%=zn.zoneid%><% resids.forEach(function(resid){ %>&amp;resids%5b%5d=<%= resid %><% }); %>"><%=zn.zonename.slice(0,2)%>:○</a><br/>
-						<% } else { %>
-							<%=zn.zonename.slice(0,2)%>:×<br/>
-						<% } %>
-					<% }); %>
-				<% } %>
-				</td>
+                <div class="d-flex justify-content-between align-items-center">
+                  <div style="font-size: 1.1rem;"><strong><%= calender.day %></strong></div>
+                  <div>
+                    <% if(calender.available == false) { %>
+                      <span class="badge badge-secondary">×</span>
+                    <% } else { %>
+                      <span class="badge badge-success">○</span>
+                    <% } %>
+                  </div>
+                </div>
+
+                <% if(calender.available == false) { %>
+                  <div class="mt-2 text-muted small">空きなし</div>
+                <% } else { %>
+                  <div class="mt-2">
+                    <% calender.zns.forEach(function(zn){ %>
+                      <% if(zn.num >= 0){ %>
+                        <a class="badge badge-pill badge-success mr-1 mb-1 p-2"
+                           style="font-weight: normal;"
+                           href="<%= Env.https_path %>?mode=reserveeditconf&amp;plan=<%= form.plan%>&amp;year=<%= form.year%>&amp;month=<%= form.month%>&amp;day=<%= calender.day%>&amp;num=<%= form.num%>&amp;zoneid=<%=zn.zoneid%><% resids.forEach(function(resid){ %>&amp;resids%5b%5d=<%= resid %><% }); %>">
+                          <%= zn.zonename.slice(0,2) %>：○
+                        </a>
+                      <% } else { %>
+                        <span class="badge badge-pill badge-secondary mr-1 mb-1 p-2" style="font-weight: normal;">
+                          <%= zn.zonename.slice(0,2) %>：×
+                        </span>
+                      <% } %>
+                    <% }); %>
+                  </div>
+                <% } %>
+
+              </td>
             <% } %>
-    			
+
             <% if(index % 7 == 6){ %>
-                </tr>
+              </tr>
             <% } %>
-        <% } ); //foreach %>
-	</table>
-    <div id="navi" class="form-group">
-        <%# <a href="= Env.https_path ?mode=reservenew&amp;plan= form.plan " class="btn btn-info m-1"  role="button" id="backbtn">戻る</a> %>
-        <a href="#" class="btn btn-info m-1"  role="button" id="backbtn">戻る</a>
-    </div>
-</div>
-<%- include('./footer.ejs'); %>
+          <% }); %>
+          </tbody>
+        </table>
+      </div>
 
+      <div id="navi" class="form-group mt-3">
+        <a href="#" class="btn btn-info m-1" role="button" id="backbtn">戻る</a>
+        <a href="<%= Env.https_path %>" class="btn btn-outline-secondary m-1" role="button">ホームへ</a>
+      </div>
+
+      <!-- もし plan.detail をHTMLで表示したいならここ（サーバ側でsanitize済み前提） -->
+      <% if (plan && plan.detail) { %>
+        <div class="card mt-4">
+          <div class="card-header bg-light">
+            <strong>詳細・注意事項</strong>
+          </div>
+          <div class="card-body">
+            <%- plan.detail %>
+          </div>
+        </div>
+      <% } %>
+
+    </div><!-- /.jumbotron -->
+  </div><!-- /.container -->
+
+  <%- include('./footer.ejs'); %>
 </body>
-
 </html>

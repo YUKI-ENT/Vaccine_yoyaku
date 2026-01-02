@@ -9,15 +9,8 @@
             <% }); %>
             
         </ul>
-        <form action="<%= Env.admin %>" method="get">
-            <input type="hidden" name="mode" value="cal" />
-            年度選択
-            <select name="id" id="select_year" class="form-control" >
-                <% plans.forEach(function(p){ %>
-                    <option value="<%=p.id%>" <% if(p.id == form.id){ %> selected="selected" <% } %> ><%= p.year %>年度</option>
-                <% }); %>
-            </select>
-        </form>
+        <%- include('./admin_selectplans.ejs', {Env,form, plans,plan:plan.id}); %>
+
         <form action="<%= Env.admin %>" method="get">
             <input type="hidden" name="mode" value="cal" />
             <input type="hidden" name="id" value="<%= form.id%>" />

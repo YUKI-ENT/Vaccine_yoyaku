@@ -438,8 +438,8 @@ async function getRecentReserve(ptuid, strdate, planid, resid = 0, intweek = 0) 
     const date1 = moment(strdate).subtract(intdays, 'days').format('YYYY-MM-DD');
     const date2 = moment(strdate).add(intdays, 'days').format('YYYY-MM-DD');
 
-    const sql = 'SELECT * FROM ' + Db.T_reserve +  ' WHERE ((ID != ?) AND (UID = ?)  AND (Del = 0) AND (PT_date BETWEEN ? AND ?))';
-    const [result,fields] = await pool.query(sql,[resid,ptuid,date1,date2]);
+    const sql = 'SELECT * FROM ' + Db.T_reserve +  ' WHERE ((ID != ?) AND (UID = ?) AND (plan = ? ) AND (Del = 0) AND (PT_date BETWEEN ? AND ?))';
+    const [result,fields] = await pool.query(sql,[resid, ptuid, planid, date1, date2]);
     return result;
   } catch (e) {
     console.log('Error in getRecentReserve : ' + e);
@@ -462,34 +462,60 @@ async function getReservesFromUid(ptuid, planid){ //UID -> 予約一覧
   }
 }
 
-async function getReservesFromFid(fid,planid){ //FID ->予約一覧 j_date,state付加
-  try{
-    const q = `SELECT ${Db.T_reserve}.*, ${Db.T_zones}.name as zonename FROM ${Db.T_reserve} 
-      INNER JOIN ${Db.T_zones} ON ${Db.T_reserve}.PT_zone = ${Db.T_zones}.id 
-      WHERE (${Db.T_reserve}.FID = ?) AND (${Db.T_reserve}.plan = ?) AND (${Db.T_reserve}.Del = 0) 
-      ORDER BY ${Db.T_reserve}.PT_date, ${Db.T_reserve}.PT_zone`;
-    
-    const [resdata, fields] = await pool.query(q,[fid,planid]);
-    const plandata = await getPlan(planid);
+async function getReservesFromFid(fid, planid = null) {
+  try {
+    let q = `
+      SELECT r.*,
+             z.name AS zonename,
+             p.name AS plan_name,
+             p.id   AS plan_id
+      FROM ${Db.T_reserve} r
+      INNER JOIN ${Db.T_zones} z ON r.PT_zone = z.id
+      INNER JOIN ${Db.T_plans} p ON r.plan = p.id
+      WHERE r.FID = ?
+        AND r.Del = 0
+    `;
+    const params = [fid];
+
+    if (planid !== null && planid !== undefined && planid !== '') {
+      q += ` AND r.plan = ?`;
+      params.push(Number(planid));
+    }
+
+    q += ` ORDER BY r.plan, r.PT_date, r.PT_zone`;
+
+    const [resdata] = await pool.query(q, params);
 
     moment.locale('ja');
-    for(let index in resdata){
-      if(moment(resdata[index].PT_date).isBefore(moment())){
-        resdata[index].state = '接種済';
-      }else if(moment(resdata[index].PT_date).isBefore(moment().add(parseInt(plandata.cancel),'hours'))){
-        resdata[index].state = '変更不可です。<br>予約を変更される場合は、お手数ですが直接病院までご連絡下さい';
+    const now = moment();
+
+    // state / j_date 付与（挙動そのまま）
+    for (const r of resdata) {
+      const pt = moment(r.PT_date);
+
+      if (pt.isBefore(now)) {
+        r.state = '接種済';
       } else {
-        resdata[index].state = '';
+        // cancelは planごとに違うので、plan_idから取る（キャッシュ推奨）
+        // まず簡単に：必要時に getPlan を呼ぶ（後でMapキャッシュにすると速い）
+        const plandata = await getPlan(r.plan_id);
+        if (pt.isBefore(moment().add(parseInt(plandata.cancel), 'hours'))) {
+          r.state = '変更不可です。<br>予約を変更される場合は、お手数ですが直接病院までご連絡下さい';
+        } else {
+          r.state = '';
+        }
       }
-      resdata[index].j_date = moment(resdata[index].PT_date).format('YYYY年M月D日(dddd)');
-    }//for
-    
+
+      r.j_date = pt.format('YYYY年M月D日(dddd)');
+    }
+
     return resdata;
   } catch (e) {
     console.log('Error in getReservesFromFid : ' + e);
     return null;
   }
 }
+
 
 async function getVaccineList(planid){  //planのワクチンリスト[]
   try{
@@ -523,31 +549,53 @@ async function set_vac_name(ptuid, planid){ //1回目か2回目か抽出・T_res
   }        
 }
 
-async function getReserveInfo(resid,fid=0){ //予約ID -> 予約情報 FID:0 adminモード。FIDが一致しないとヒットしないように
-  try{
-    let q,d;
+async function getReserveInfo(resid, fid = 0) {
+  // 予約ID -> 予約情報
+  // fid = 0 : adminモード（FIDチェックなし）
+  try {
+    let q, d;
 
-    if(fid == 0){
-      q = `SELECT ${Db.T_reserve}.*, ${Db.T_zones}.name as zonename FROM ${Db.T_reserve} INNER JOIN ${Db.T_zones} ON ${Db.T_reserve}.PT_zone = ${Db.T_zones}.id WHERE ${Db.T_reserve}.ID = ?`;
+    if (fid === 0) {
+      q = `
+        SELECT
+          ${Db.T_reserve}.*,
+          ${Db.T_zones}.name AS zonename,
+          ${Db.T_plans}.name AS plan_name
+        FROM ${Db.T_reserve}
+        INNER JOIN ${Db.T_zones}
+          ON ${Db.T_reserve}.PT_zone = ${Db.T_zones}.id
+        INNER JOIN ${Db.T_plans}
+          ON ${Db.T_reserve}.plan = ${Db.T_plans}.id
+        WHERE ${Db.T_reserve}.ID = ?
+      `;
       d = [resid];
     } else {
-      q = `SELECT ${Db.T_reserve}.*, ${Db.T_zones}.name as zonename FROM ${Db.T_reserve} 
-      INNER JOIN ${Db.T_zones} ON ${Db.T_reserve}.PT_zone = ${Db.T_zones}.id 
-      WHERE ${Db.T_reserve}.ID = ? AND ${Db.T_reserve}.FID = ?`;
-      d = [resid,fid];
+      q = `
+        SELECT
+          ${Db.T_reserve}.*,
+          ${Db.T_zones}.name AS zonename,
+          ${Db.T_plans}.name AS plan_name
+        FROM ${Db.T_reserve}
+        INNER JOIN ${Db.T_zones}
+          ON ${Db.T_reserve}.PT_zone = ${Db.T_zones}.id
+        INNER JOIN ${Db.T_plans}
+          ON ${Db.T_reserve}.plan = ${Db.T_plans}.id
+        WHERE ${Db.T_reserve}.ID = ?
+          AND ${Db.T_reserve}.FID = ?
+      `;
+      d = [resid, fid];
     }
-    const [data] = await pool.query(q,d);
 
-    if(data.length > 0) {
-      return data[0];
-    } else {
-      return null;
-    }
-  } catch(e){
+    const [data] = await pool.query(q, d);
+
+    return (data.length > 0) ? data[0] : null;
+
+  } catch (e) {
     console.log('Error in getReserveInfo : ' + e);
     return null;
-  }        
+  }
 }
+
 
 async function getAllOtherReserve(resid, ptuid, planid){ //有効な他の予約を返す
 	try{
@@ -784,6 +832,47 @@ async function replacePlanRules(planId, rules) {
   }
 }
 
+async function getPlanMaxDoses(planid) {
+  let ret = 2;
+  try{
+    // reserve_plan_rules から required_doses の最大値を取得
+    const sql = `
+      SELECT COALESCE(MAX(required_doses), 2) AS max_doses
+      FROM reserve_plan_rules
+      WHERE plan_id = ?
+    `;
+    const [rows] = await pool.query(sql, [planid]);
+    ret = parseInt(rows[0]?.max_doses ?? 1, 10);
+  } catch(e){
+    console.log(e);
+  } finally{
+    return ret;
+  }
+}
+
+async function getRecommendedDosesByAge(planid, ageMonths) {
+  try {
+    const sql = `
+      SELECT required_doses
+      FROM reserve_plan_rules
+      WHERE plan_id = ?
+        AND min_age_m <= ?
+        AND max_age_m >= ?
+      ORDER BY sort ASC
+    `;
+    const [rows] = await pool.query(sql, [planid, ageMonths, ageMonths]);
+
+    if (!rows || rows.length === 0) return null;
+
+    return Math.max(...rows.map(r => parseInt(r.required_doses, 10)));
+
+  } catch (e) {
+    // ★ ログだけ出して「推奨不明」として扱う
+    console.error('getRecommendedDosesByAge error:', e);
+    return null;
+  }
+}
+
 module.exports.pool = pool;
 module.exports.getLoginFailureCount = getLoginFailureCount;
 module.exports.sid2ptinfo = sid2ptinfo;
@@ -819,3 +908,5 @@ module.exports.setSettings = setSettings;
 module.exports.getRequiredMl = getRequiredMl;
 module.exports.getPlanRules = getPlanRules;
 module.exports.replacePlanRules = replacePlanRules;
+module.exports.getPlanMaxDoses = getPlanMaxDoses;
+module.exports.getRecommendedDosesByAge = getRecommendedDosesByAge;

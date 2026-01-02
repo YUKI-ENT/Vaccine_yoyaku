@@ -16,7 +16,9 @@
         <h2>予約手続きが完了しました。</h2>
         <ul>
             <li><a href="<%= Env.https_path %>?mode=reservechange&plan=<%=planid%>">予約一覧・変更ページ</a>で予約一覧をご確認下さい。</li>
-            <li class="text-danger">13歳未満の方で2回接種を希望される場合は、「新規予約」メニューから2回目の予約も続けて行ってください</li>
+            <% if(maxDoses > 1) { %>
+                <li class="text-danger"><%= maxDoses %>回接種される方は、「新規予約」メニューから2回目以降の予約も続けて行ってください</li>
+            <% } %>
         </ul>
         <div id="navi" class="form-inline">
             <a href="<%= Env.https_path %>?mode=reservenew&plan=<%=planid%>"  class="btn btn-primary m-2">新規予約</a>

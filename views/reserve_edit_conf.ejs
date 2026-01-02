@@ -1,56 +1,91 @@
 <%- include('./header.ejs', {Env: Env}); %>
 <body>
     <%- include('./navbar.ejs', {Env: Env}); %>
-    
 
 <div id="container" class="container">
-		<nav aria-label="パンくずリスト">
-			<ol class="breadcrumb">
-				<li class="breadcrumb-item"><a href="<%= Env.https_path %>">ホーム</a></li>
-                <li class="breadcrumb-item">予約の確認・変更・キャンセル</li>
-                <li class="breadcrumb-item">予約日変更(日付選択)</li>
-				<li class="breadcrumb-item active" aria-current="page">予約日変更確認</li>
-			</ol>
-		</nav>
-	<div class="jumbotron">
-        <h2>予約日変更の確認</h2>
-        <div class="text-danger">まだ変更は確定していません。下記に間違いがなければ、確定のボタンを押してください。</div>
-        
-        <table class="table table-border">
-            <tr><th colspan="2">変更前</th></tr>
-            <% res.forEach((r)=>{ %>
-                <tr>
-                    <td><%=r.PT_name%>様(<%=r.Vac_name%>回目)</td><td><%=r.j_date%><%=r.zonename%></td>
-                </tr>
-            <% }); %>
-            <tr><th colspan="2" class="text-center">↓</th></tr>   
-            <tr>
-                <th>変更後の日付</th><td><%=newres.j_date%><%=newres.zonename%></td>
-            </tr>
-            <tr>
-                <th>変更・キャンセルの期限</th>
-                <td><% if(plan.cancel) { %>接種日の<%=plan.cancel%>時間前まで受付<% } else { %>キャンセル時は診療時間帯にお電話ください<% } %></td>
-            </tr>
-        </table>
-        <div class="form-group">
-            <form action="<%= Env.https_path %>" method="get">
-                <input type="hidden" name="mode" value="reserveeditcomplete" />
-                <input type="hidden" name="token" value="<%=token%>" />
-                <input type="hidden" name="data" value="<%=data%>" />
-                
-                <div class="form-group"><input type="submit" value="上記の内容で予約を確定する" class="btn btn-primary"/></div>
-            </form>
-        </div>
+    <nav aria-label="パンくずリスト">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="<%= Env.https_path %>">ホーム</a></li>
+            <li class="breadcrumb-item">予約の確認・変更・キャンセル</li>
+            <li class="breadcrumb-item">予約日変更(日付選択)</li>
+            <li class="breadcrumb-item active" aria-current="page">予約日変更確認</li>
+        </ol>
+    </nav>
 
+    <!-- タイトル＋予防接種名 -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body py-3">
+            <h2 class="mb-2">予約日変更の確認</h2>
+        </div>
     </div>
+    <%- include('./plan_title.ejs', { plan: plan }); %>
+
+    <div class="jumbotron">
+        <p class="text-danger font-weight-bold">
+            まだ変更は確定していません。<br>
+            下記に間違いがなければ、確定ボタンを押してください。
+        </p>
+
+        <table class="table table-bordered">
+            <thead class="thead-light">
+                <tr>
+                    <th colspan="2">変更前の予約</th>
+                </tr>
+            </thead>
+            <tbody>
+                <% res.forEach((r)=>{ %>
+                    <tr>
+                        <td>
+                            <strong><%= r.PT_name %></strong> 様<br>
+                            <small class="text-muted"><%= r.Vac_name %>回目</small>
+                        </td>
+                        <td>
+                            <%= r.j_date %><br>
+                            <span class="badge badge-info"><%= r.zonename %></span>
+                        </td>
+                    </tr>
+                <% }); %>
+
+                <tr>
+                    <td colspan="2" class="text-center font-weight-bold">↓ 変更後 ↓</td>
+                </tr>
+
+                <tr class="table-success">
+                    <td colspan="2">
+                        <strong><%= newres.j_date %></strong>
+                        <span class="badge badge-success ml-2"><%= newres.zonename %></span>
+                    </td>
+                </tr>
+
+                <tr>
+                    <th>変更・キャンセルの期限</th>
+                    <td>
+                        <% if(plan.cancel) { %>
+                            接種日の <strong><%= plan.cancel %></strong> 時間前まで受付
+                        <% } else { %>
+                            キャンセル時は診療時間帯にお電話ください
+                        <% } %>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+
+        <form action="<%= Env.https_path %>" method="get" class="mt-3">
+            <input type="hidden" name="mode" value="reserveeditcomplete" />
+            <input type="hidden" name="token" value="<%= token %>" />
+            <input type="hidden" name="data" value="<%= data %>" />
+
+            <button type="submit" class="btn btn-primary btn-lg">
+                上記の内容で予約を確定する
+            </button>
+        </form>
+    </div>
+
     <div id="navi" class="form-group">
-        <%# <a href="= Env.https_path ?mode=reservenew&amp;plan= form.plan " class="btn btn-info m-1"  role="button" id="backbtn">戻る</a> %>
-        <a href="#" class="btn btn-info m-1"  role="button" id="backbtn">戻る</a>
+        <a href="#" class="btn btn-info m-1" role="button" id="backbtn">戻る</a>
     </div>
 </div>
+
 <%- include('./footer.ejs'); %>
-
 </body>
-
 </html>
-

@@ -1,62 +1,113 @@
 <%- include('./header.ejs', {Env: Env}); %>
 <body>
-    <%- include('./navbar.ejs', {Env: Env}); %>
-    
-    <div id="container" class="container">
+  <%- include('./navbar.ejs', {Env: Env}); %>
+
+  <div id="container" class="container">
     <nav aria-label="パンくずリスト">
-        <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="<%= Env.https_path %>">ホーム</a></li>
-            <li class="breadcrumb-item active" aria-current="page">新規予約(人数選択)</li>
-        </ol>
+      <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="<%= Env.https_path %>">ホーム</a></li>
+        <li class="breadcrumb-item active" aria-current="page">新規予約(人数選択)</li>
+      </ol>
     </nav>
-<div class="jumbotron">
-    <% if(errors.length >0) { %>
-        <h2>新規予約</h2>
-            <ul>
-                <% errors.forEach(function (value, key) { %>
-                    <li class="text-danger"><%= value %></li>
-                <% }); %>
-            </ul>
-    <% } else { %>
-        <h2>予約する人の選択</h2>
-            <div class="form-group">
-                <form action="<%= Env.https_path %>" method="get">
-                    <input type="hidden" name="mode" value="reservenewcal" />
-                    <input type="hidden" name="plan" value="<%=plan.id%>" />
-                    <ul>
-                        <li>同時に<strong>6人</strong>までの予約が可能です。7人以上の接種を希望される場合は、日か時間帯を分けていただく必要があります。</li>
-                        <li>予約する人にチェックを入れて下さい</li>
-                    </ul>
-                    <table class="table">
-                        <tr><th>予約する</th><th>氏名</th></tr>
-                        <% family.forEach(function (f, key) { %>
-                            <tr>
-                                <td>
-                                    <div class="form-check">
-                                        <input type="checkbox" name="ptuids[]" id="ptuids<%=f.UID%>" data-uid="<%=f.UID%>" value="<%=f.UID%>"  class="form-check-input">
-                                    </div>
-                                </td>
-                                <td>
-                                    <%=f.name1%>  <%=f.name2%>様(<%=f.birth%>生)
-                                    </div>
-                                </td>
-                            </tr>
-                        <% }); %>
-                    </table>
-                    
-                    <input type="submit" value="次へ"  class="btn btn-primary"/>
-                </form>
+
+    <div class="jumbotron py-4">
+      <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-md-between">
+        <div class="mb-3">
+            <h2 class="mb-1">予約する人の選択</h2>
+            
+        </div>
+      </div>
+        <%- include('./plan_title.ejs', { plan: plan }); %>
+
+      <!-- エラー表示 -->
+      <% if (errors && errors.length > 0) { %>
+        <div class="alert alert-danger mt-3" role="alert">
+          <strong>入力内容をご確認ください</strong>
+          <ul class="mb-0 mt-2">
+            <% errors.forEach(function (value) { %>
+              <li><%= value %></li>
+            <% }); %>
+          </ul>
+        </div>
+      <% } %>
+
+      <div class="alert alert-info mt-3" role="alert">
+        <ul class="mb-0">
+          <li>同時に <strong>6人</strong> まで予約できます（7人以上は日付や時間帯を分けてください）。</li>
+          <li>予約する方にチェックを入れて「次へ」を押してください。</li>
+        </ul>
+      </div>
+
+      <!-- 選択フォーム -->
+      <form action="<%= Env.https_path %>" method="get" class="mt-3">
+        <input type="hidden" name="mode" value="reservenewcal" />
+        <input type="hidden" name="plan" value="<%= plan.id %>" />
+
+        <div class="card shadow-sm">
+          <div class="card-header bg-light">
+            <strong>予約する方を選択</strong>
+          </div>
+
+          <div class="card-body">
+            <div class="table-responsive">
+              <table class="table table-hover mb-0">
+                <thead>
+                  <tr>
+                    <th style="width: 110px;">選択</th>
+                    <th>氏名</th>
+                    <th style="width: 160px;">生年月日</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% family.forEach(function (f) { %>
+                    <tr>
+                      <td>
+                        <div class="form-check m-0">
+                          <input
+                            type="checkbox"
+                            name="ptuids[]"
+                            id="ptuids<%= f.UID %>"
+                            data-uid="<%= f.UID %>"
+                            value="<%= f.UID %>"
+                            class="form-check-input"
+                          >
+                          <label class="form-check-label" for="ptuids<%= f.UID %>">
+                            予約
+                          </label>
+                        </div>
+                      </td>
+                      <td>
+                        <strong><%= f.name1 %> <%= f.name2 %></strong> 様
+                      </td>
+                      <td>
+                        <span class="text-muted"><%= f.birth %></span>
+                      </td>
+                    </tr>
+                  <% }); %>
+                </tbody>
+              </table>
             </div>
-    <% } %>
-    <div id="navi" class="form-group">
-        <a href="#" class="btn btn-info mt-1"  role="button" id="backbtn">戻る</a>
-    </div>
 
+            <button type="submit" class="btn btn-primary btn-lg btn-block mt-4">
+              次へ（日時選択へ）
+            </button>
 
-</div>
-</div>
-<%- include('./footer.ejs'); %>
-<%# <script type="text/javascript" src="/js/reserve_select.js"></script> %>
+            <p class="text-muted small mt-2 mb-0">
+              ※チェックがない場合は次へ進めません。
+            </p>
+          </div>
+        </div>
+      </form>
+
+      <div id="navi" class="form-group mt-3">
+        <a href="#" class="btn btn-info m-1" role="button" id="backbtn">戻る</a>
+        <a href="<%= Env.https_path %>" class="btn btn-outline-secondary m-1" role="button">ホームへ</a>
+      </div>
+
+    </div><!-- /.jumbotron -->
+  </div><!-- /.container -->
+
+  <%- include('./footer.ejs'); %>
+  <%# <script type="text/javascript" src="/js/reserve_select.js"></script> %>
 </body>
-
 </html>

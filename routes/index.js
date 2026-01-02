@@ -695,139 +695,180 @@ async function reserve_new_select(req,res){
   }
 }
 
-async function reserve_new_cal(req, res, edit = 0,reserved_ids = []){ //変更モードと新規モード兼用
+async function reserve_new_cal(req, res, edit = 0, reserved_ids = []) { //変更モードと新規モード兼用
   //変更モードで起動:edit=1
   let errors = [];
-  try{
+  try {
     let families = [], resinfos = [];
-    let num; 
-    let newvials = 0, decvials= 0, required_ml = 0.0;
-    let args = [],ptuids = [];
+    let num;
+    let newvials = 0, decvials = 0, required_ml = 0.0;
+    let args = [], ptuids = [];
     moment.locale('ja');
     const userdata = getUserinfos(req);
 
-    //引数チェック
-    args = (edit === 0) ? ['plan','ptuids'] : ['plan','resids'];
-    if(check_args(req.query,args).length > 0)  {
-        errors.push('予約操作を行う人が選択されていません。元のページにもどって、選択しなおして下さい');
-        error_render(req,res,'reserve_new_cal',errors);
-        return;
+    // ---- helper（挙動を変えない範囲で重複排除） ----
+    function buildZonesForDay(day, wakus, resnumbers, partySize, subtractPartySize) {
+      const zns = [];
+      let av = false;
+
+      if (wakus[day]) {
+        for (const waku of wakus[day]) {
+          const resdata = (resnumbers[day]) ? resnumbers[day].find((r) => r.zoneid === waku.zoneid) : null;
+          const resnum = (resdata) ? resdata.num : 0;
+          const aki = waku.num - resnum - (subtractPartySize ? partySize : 0);
+
+          zns.push({
+            zoneid: waku.zoneid,
+            zonename: waku.zonename,
+            num: aki
+          });
+          if (aki >= 0) av = true;
+        }
+      }
+      return { zns, av };
     }
-    if(!userdata){
+
+    function isHoliday(holidays, year, month, day) {
+      // 祝日判定ロジックは元のまま
+      const y = String(year);
+      const mmdd = ('00' + month).slice(-2) + ('00' + day).slice(-2);
+      return (y in holidays) && (holidays[y].indexOf(mmdd) >= 0);
+    }
+    // ---- helper end ----
+
+    // 引数チェック
+    args = (edit === 0) ? ['plan', 'ptuids'] : ['plan', 'resids'];
+    if (check_args(req.query, args).length > 0) {
+      errors.push('予約操作を行う人が選択されていません。元のページにもどって、選択しなおして下さい');
+      error_render(req, res, 'reserve_new_cal', errors);
+      return;
+    }
+    if (!userdata) {
       errors.push('不正なアクセスです。トップページから操作し直してみてください。');
-      error_render(req,res,'reserve_edit',errors);
+      error_render(req, res, 'reserve_edit', errors);
       return;
     }
     const fid = userdata.FID;
-    
+
     const planid = parseInt(req.query.plan);
     let plandata = await sql.getPlan(planid);
-    if(!plandata){
+    if (!plandata) {
       errors.push('指定の予防接種枠が存在しません。もう一度トップページから操作し直してください。');
-      error_render(req,res,'reserve_new_cal',errors);
+      error_render(req, res, 'reserve_new_cal', errors);
       return;
     }
-    if (plandata.break && plandata.detail) {
-      plandata.detail = '<p>' + nl2br(plandata.detail) + '</p>';
-    }
+
+    // detailのHTML化（元コードの条件のまま）
+    // if (plandata.break && plandata.detail) {
+    //   plandata.detail = '<p>' + nl2br(plandata.detail) + '</p>';
+    // }
+
     let full = plandata.full;
     const syringe = parseInt(plandata.syringe);
-    
-    //表示年月日取得
+
+    // 表示年月日取得
     let year = moment(plandata.start).year();
     let month = moment(plandata.start).month() + 1;
     let day = 1;
-    if(req.query.yearmonth){
-      let ym = req.query.yearmonth.split('-');
+    if (req.query.yearmonth) {
+      const ym = req.query.yearmonth.split('-');
       year = parseInt(ym[0]);
       month = parseInt(ym[1]);
     }
 
-    //予約済人数取得枠取得
-    const respromise = sql.getReservedNumber(planid, year, month);
-    const wakupromise = sql.getWaku(planid,year,month);
-    const vialmlpromise = sql.getReservedVialMl(planid, plandata);
-    const resnumbers = await respromise;
-    const wakus = await wakupromise;
-    const vialml = await vialmlpromise;
+    // 予約済人数 / 枠 / 残量（同時取得）
+    const [resnumbers, wakus, vialml] = await Promise.all([
+      sql.getReservedNumber(planid, year, month),
+      sql.getWaku(planid, year, month),
+      sql.getReservedVialMl(planid, plandata),
+    ]);
 
-    //新規：ptuids -> families、変更：resids-> resinfo
-    if(edit === 0) {
-      ptuids = req.query.ptuids ;
-      //UIDから患者名取得
-      // 家族情報取得
-      for(let ptuid of ptuids){
-        let ptinfo= await sql.uid2ptinfo(ptuid);
+    // 新規：ptuids -> families、変更：resids-> resinfo
+    if (edit === 0) {
+      ptuids = req.query.ptuids;
+
+      for (const ptuid of ptuids) {
+        const ptinfo = await sql.uid2ptinfo(ptuid);
         families.push({
-          'uid'  : ptuid,
-          'name' : ptinfo.name1 + ptinfo.name2
+          uid: ptuid,
+          name: ptinfo.name1 + ptinfo.name2
         });
-        //3回以上の予約でないかチェック:新規予約のみ
-          let reservecount = await more2_check(ptuid, planid);
-          if(reservecount >= 2) errors.push(ptinfo.name1 + ptinfo.name2 + '様：既に2回目までの予約が入っています。3回以上の予約はできません。');
-      }// for
-      //人数選択
-      num = ptuids.length; //人数が正しく取得できるか要確認
-      required_ml = await sql.getRequiredMl(plandata, moment([year,month -1,1]).endOf('month'),ptuids);
+
+        // 3回以上の予約でないかチェック:新規予約のみ
+        const reservecount = await more2_check(ptuid, planid);
+        // planによって上限回数が違う
+        const maxDoses = await sql.getPlanMaxDoses(planid);
+        if (reservecount >= maxDoses) errors.push(ptinfo.name1 + ptinfo.name2 + '様：既に' + reservecount + '回の予約が入っています。' + (reservecount +1) + '回以上の予約はできません。');
+      }
+
+      // 人数
+      num = ptuids.length;
+      required_ml = await sql.getRequiredMl(plandata, moment([year, month - 1, 1]).endOf('month'), ptuids);
       decvials = 0;
       newvials = Math.ceil(required_ml / parseFloat(plandata.mlpervial));
-    } else { //更新モード
-      if(reserved_ids.length === 0) reserved_ids = req.query.resids;
+    } else {
+      if (reserved_ids.length === 0) reserved_ids = req.query.resids;
       num = reserved_ids.length;
       newvials = 0;
-      let res_ml =0;
-      //予約情報取得
-      for(let resid of reserved_ids){
-        let resinfo = await sql.getReserveInfo(resid,fid);
+
+      let res_ml = 0;
+      for (const resid of reserved_ids) {
+        const resinfo = await sql.getReserveInfo(resid, fid);
         resinfo.j_date = moment(resinfo.PT_date).format('YYYY年M月D日(dddd)');
         ptuids.push(resinfo.UID);
         resinfos.push(resinfo);
         res_ml += parseFloat(resinfo.Vac_volume);
       }
+
       const res_date = moment(resinfos[0].PT_date);
-      //同一ptuid(1,2回目同時)の変更はエラー
-      if(ptuids.length !== Array.from(new Set(ptuids)).length){
+
+      // 同一ptuid(1,2回目同時)の変更はエラー
+      if (ptuids.length !== Array.from(new Set(ptuids)).length) {
         errors.push('同一人物を同時に変更することはできません。接種回数ごとに変更操作を行ってください。');
       }
 
-      //移動により残量バイアル数が変更するか? required_ml / vialml割り切れる→どこでも移動可、割り切れない→元の日が残あれば端数のある日のみ
-      //減るバイアル数
-      decvials = vialml[res_date.format('YYYY-MM-DD')].vial - Math.ceil((vialml[res_date.format('YYYY-MM-DD')].ml-res_ml)/plandata.mlpervial);
-      required_ml = await sql.getRequiredMl(plandata, moment([year,month -1,1]).endOf('month'),ptuids); //月末で3歳でなければ0.25で計算
+      // 減るバイアル数（元コードの式そのまま）
+      const key = res_date.format('YYYY-MM-DD');
+      decvials = vialml[key].vial - Math.ceil((vialml[key].ml - res_ml) / plandata.mlpervial);
+
+      required_ml = await sql.getRequiredMl(plandata, moment([year, month - 1, 1]).endOf('month'), ptuids);
       newvials = Math.ceil(required_ml / parseFloat(plandata.mlpervial));
     }
 
-    if(num < 1 ) errors.push('接種する人が選択されていません。元のページにもどって、選択しなおして下さい');
-    if(errors.length > 0){
-      error_render(req,res,'reserve_new_cal',errors);
+    if (num < 1) errors.push('接種する人が選択されていません。元のページにもどって、選択しなおして下さい');
+    if (errors.length > 0) {
+      error_render(req, res, 'reserve_new_cal', errors);
       return;
     }
 
-    //表示年 
-    let yearmonths = [];
-    for(let y=moment(plandata.start).startOf('month');y.isSameOrBefore(moment(plandata.end));y.add(1,'months')){
-      let flag = (y.year() === year && y.month()+1 === month) ? true : false;
-      yearmonths.push({id: y.format('YYYY-MM'), name: y.format('YYYY年M月'), flag: flag});
+    // 表示年・月一覧
+    const yearmonths = [];
+    for (let y = moment(plandata.start).startOf('month'); y.isSameOrBefore(moment(plandata.end)); y.add(1, 'months')) {
+      const flag = (y.year() === year && y.month() + 1 === month) ? true : false;
+      yearmonths.push({ id: y.format('YYYY-MM'), name: y.format('YYYY年M月'), flag: flag });
     }
-    
 
-    //ワクチン残量取得、バイアル総数：バイアル総数が既定値に達するようなら、端数モードに vialml{'YYYY-MM-DD':{ml:, vial:},,,total_vial:,full:} シリンジモード total_vialとfullだけを返す
-    if(vialml.total_vial + newvials - decvials > parseInt(plandata.vial)) full = 1;
-    //祝日取得
+    // バイアル総数が既定値に達するようなら満員扱い（元コードそのまま）
+    if (vialml.total_vial + newvials - decvials > parseInt(plandata.vial)) full = 1;
+
+    // 祝日
     const holidays = require('../holidays.json');
 
-    //カレンダ作成
-    let w = moment([year,month-1,1]).day();
-    let lastdate = moment([year,month-1,1]).daysInMonth();
-    let calenders = [], zns = [];
-    let type = '', count = 0, av=false;
-    let applydate = moment().add(parseInt(plandata.apply),'days');
-    
+    // カレンダ作成
+    let w = moment([year, month - 1, 1]).day();
+    let lastdate = moment([year, month - 1, 1]).daysInMonth();
+    let calenders = [];
+    let type = '';
+    let count = 0;
+    let av = false;
+    let zns = [];
+    let applydate = moment().add(parseInt(plandata.apply), 'days');
+
     for (let i = 0; i < 42; i++) {
       av = false;
-      zns = [];  //set default
+      zns = [];  // set default
 
-      if (i === w) { //最初の日
+      if (i === w) { // 最初の日
         type = 'day';
       } else if (day > lastdate) {
         type = '';
@@ -841,94 +882,70 @@ async function reserve_new_cal(req, res, edit = 0,reserved_ids = []){ //変更�
       } else if (type) {
         type = 'day';
       }
-  
+
       if (type) {
-        //祝日
-        if(String(year) in holidays && holidays[String(year)].indexOf(('00' + month).slice(-2) + ('00' + day).slice(-2)) >= 0){
+        // 祝日なら日曜扱い（元ロジック）
+        if (isHoliday(holidays, year, month, day)) {
           type = 'sunday';
-        } 
-      
-        //残数取得
-        let date = moment([year, month-1, day]).endOf('days');
-        //端数モード
-        if ((full) && (syringe === 0)) {
-          if(date.isAfter(applydate) && type){ //稼働日
-            let zanryou = 0;
-            strdate = date.format('YYYY-MM-DD');
-            if(vialml[strdate]){
-              zanryou =  vialml[strdate].vial * parseFloat(plandata.mlpervial) - vialml[strdate].ml;
-            } 
-            if(zanryou + (decvials * plandata.mlpervial) >= required_ml){
-           // if (zanryou >= parseFloat(plandata.std_dose)) { //端数ある日
-           //   let daylimit = Math.floor(zanryou/parseFloat(plandata.std_dose)) - num;
-              //枠チェック
-              if(wakus[day]){
-                wakus[day].forEach(function(waku){ //nullの0うめ必要
-                  let resdata = (resnumbers[day]) ? resnumbers[day].find((r) => r.zoneid === waku.zoneid) : null;
-                  let resnum = (resdata) ? resdata.num : 0;
-                  let aki = waku.num - resnum - num;
-            //      aki = Math.min(aki, daylimit);
-                  zns.push({
-                    zoneid: waku.zoneid,
-                    zonename: waku.zonename,
-                    num: aki
-                  });
-                  if(aki >= 0) av = true;
-                }); //forEach
-              } //wakus
-            } //残量あり
-          } //稼働日
-        } else if((full) && (syringe === 1) && (date.isAfter(applydate))){ //シリンジモードで満員のとき
-          //シリンジモードで変更の時は、枠の範囲で自由に変更できるように
-          if(edit === 1){
-            if(wakus[day]){
-              wakus[day].forEach(function(waku){ //nullの0うめ必要
-                let resdata = (resnumbers[day]) ? resnumbers[day].find((r) => r.zoneid === waku.zoneid) : null;
-                let resnum = (resdata) ? resdata.num : 0;
-                let aki = waku.num - resnum ;
-                zns.push({
-                  zoneid: waku.zoneid,
-                  zonename: waku.zonename,
-                  num: aki
-                });
-                if(aki >= 0) av = true;
-              }); //forEach
-            } //wakus
-          }
-        } else if((date.isAfter(applydate) && type)) { //残ワクチンがある場合 接種人数と残量の計算が必要？
-          //枠チェック
-          if(wakus[day]){
-            wakus[day].forEach(function(waku){ //nullの0うめ必要
-              let resdata = (resnumbers[day]) ? resnumbers[day].find((r) => r.zoneid === waku.zoneid) : null;
-              let resnum = (resdata) ? resdata.num : 0;
-              let aki = waku.num - resnum ;
-              zns.push({
-                zoneid: waku.zoneid,
-                zonename: waku.zonename,
-                num: aki
-              });
-              if(aki >= 0) av = true;
-            }); //forEach
-          } //wakus
         }
+
+        // 残数取得
+        let date = moment([year, month - 1, day]).endOf('days');
+
+        // ---- 端数モード（満員＆バイアル） ----
+        if ((full) && (syringe === 0)) {
+          if (date.isAfter(applydate) && type) { // 稼働日
+            let zanryou = 0;
+            const strdate = date.format('YYYY-MM-DD');
+            if (vialml[strdate]) {
+              zanryou = vialml[strdate].vial * parseFloat(plandata.mlpervial) - vialml[strdate].ml;
+            }
+
+            if (zanryou + (decvials * plandata.mlpervial) >= required_ml) {
+              // 枠チェック（元の引き算: aki = waku.num - resnum - num）
+              const r = buildZonesForDay(day, wakus, resnumbers, num, true);
+              zns = r.zns;
+              av = r.av;
+            }
+          }
+        }
+        // ---- 満員＆シリンジ ----
+        else if ((full) && (syringe === 1) && (date.isAfter(applydate))) {
+          // シリンジ満員で変更の時は、枠の範囲で自由に変更できる（元コード）
+          if (edit === 1) {
+            // 元の引き算: aki = waku.num - resnum （numを引かない）
+            const r = buildZonesForDay(day, wakus, resnumbers, num, false);
+            zns = r.zns;
+            av = r.av;
+          }
+        }
+        // ---- 通常（満員でない / シリンジ満員じゃない）----
+        else if ((date.isAfter(applydate) && type)) {
+          // 元の引き算: aki = waku.num - resnum （numを引かない）
+          const r = buildZonesForDay(day, wakus, resnumbers, num, false);
+          zns = r.zns;
+          av = r.av;
+        }
+
         calenders.push({
-          'day'       : day,
-          'type'      : type,
-          'available' : av,
-          'zns'       : zns
+          day: day,
+          type: type,
+          available: av,
+          zns: zns
         });
+
         day++;
-      } else { // type
+      } else {
         calenders.push({
-          'day'       : 0,
-          'type'      : '',
-          'available' : false,
-          'zns'       : null
+          day: 0,
+          type: '',
+          available: false,
+          zns: null
         });
       }
-    } // for 
+    }
 
-    let form={
+    let form = {
       plan: planid,
       num: num,
       year: year,
@@ -937,11 +954,11 @@ async function reserve_new_cal(req, res, edit = 0,reserved_ids = []){ //変更�
     };
 
     let template = (edit === 0) ? 'reserve_new_cal' : 'reserve_edit_cal';
-    if(errors.length > 0){
-      error_render(req,res,'reserve_new_cal',errors);
-      return; 
-    } else { 
-      res.render(template, { 
+    if (errors.length > 0) {
+      error_render(req, res, 'reserve_new_cal', errors);
+      return;
+    } else {
+      res.render(template, {
         Env: Env,
         errors: errors,
         plan: plandata,
@@ -949,19 +966,22 @@ async function reserve_new_cal(req, res, edit = 0,reserved_ids = []){ //変更�
         resinfos: resinfos,
         resids: reserved_ids,
         ptuids: ptuids,
-        form:  form,
+        form: form,
         yearmonths: yearmonths,
         calenders: calenders
       });
-    } 
-  } catch(e) {
+    }
+  } catch (e) {
     errors.push(e);
-    error_render(req,res,'reserve_new_cal',errors);
+    error_render(req, res, 'reserve_new_cal', errors);
   }
 }
 
+
 async function reserve_new_conf(req,res){
   let errors = [];
+  let warnings = [];
+
   try{
     let userdata = getUserinfos(req);
     if(check_args(req.query,['plan','ptuids','year','month','day']).length > 0 || !userdata){
@@ -993,6 +1013,7 @@ async function reserve_new_conf(req,res){
     // 家族情報取得
     const ptuids = req.query.ptuids;
     let families = [];
+
     for(let ptuid of ptuids){
       let ptdata = await sql.uid2ptinfo(ptuid);
       families.push(ptdata);
@@ -1003,7 +1024,34 @@ async function reserve_new_conf(req,res){
           errors.push(r.PT_name + '様、接種間隔があいていません。' + r.PT_date + 'の予約から' + plandata.intweek + '週間以上あけてください。');
         }) ;
       }
+      // --- ②推奨回数チェック（警告：confirm用） ---
+      // ptdata に生年月日が入っている想定（例: ptdata.birthday / ptdata.birth など）
+      const birth = ptdata.birth; 
+      if (birth) {
+        let b = null;
+        if (birth instanceof Date) {
+          b = moment(birth);   // ← これが一番安全
+        } else if (typeof birth === 'string') {
+          b = moment(birth, ['YYYY-MM-DD','YYYY/MM/DD','YYYYMMDD'], true);
+        }
+        if (b && b.isValid()) {
+          const ageMonths = rdate.diff(b, 'months'); // 予約日時点の月齢
+          const recDoses = await sql.getRecommendedDosesByAge(planid, ageMonths);
+
+          if (recDoses !== null) {
+            const currentCount = await more2_check(ptuid, planid);
+            const afterCount = currentCount + 1; // 今回を含めた回数
+
+            if (afterCount > recDoses) {
+              warnings.push(
+                `${ptdata.name1}${ptdata.name2}様（予約日時点 ${formatAgeYM(ageMonths)}）は推奨接種回数が${recDoses}回ですが、今回で${afterCount}回目の予約になります。`
+              );
+            }
+          }
+        }
+      }
     }
+
     if(errors.length > 0){
       error_render(req,res, '予約確認',errors);
       return;
@@ -1028,6 +1076,7 @@ async function reserve_new_conf(req,res){
     res.render('reserve_new_conf', { 
       Env: Env,
       errors: errors,
+      warnings: warnings,
       plan: plandata,
       families: families,
       res: resdata,
@@ -1041,6 +1090,13 @@ async function reserve_new_conf(req,res){
     errors.push(e);
     error_render(req,res,'reserve_new_conf',errors);
   } 
+}
+
+function formatAgeYM(ageMonths) {
+  if (!Number.isInteger(ageMonths) || ageMonths < 0) return '';
+  const years = Math.floor(ageMonths / 12);
+  const months = ageMonths % 12;
+  return `${years}才${months}ヶ月`;
 }
 
 async function reserve_edit_conf(req,res)
@@ -1147,6 +1203,7 @@ async function reserve_new_complete(req,res){
     const zoneid = data.resdata.zoneid;
     const ptuids = data.ptuids; //null?? resids?
     const plandata = await sql.getPlan(planid);
+    const maxDoses = await sql.getPlanMaxDoses(planid);
 
     const userdata = getUserinfos(req);
     const ptuid = userdata.UID;
@@ -1205,7 +1262,8 @@ async function reserve_new_complete(req,res){
       errors: errors,
       plan: plandata,
       planid: planid,
-      form:  req.query
+      form:  req.query,
+      maxDoses 
     });
 
     //接種回数設定
@@ -1361,22 +1419,23 @@ async function reserve_change(req,res){
   let errors = [];
   try{
     const userdata = getUserinfos(req);
-    if(!req.user || !userdata || !req.query.plan){
+    if(!req.user || !userdata){
       errors.push("セッションエラー：ログインから一定時間が経過したため、ログインしなおしてください");
       error_render(req,res,'reserve_change',errors);
       return;
     }
 
     const fid = userdata.FID;
-    const planid = req.query.plan;
+    // plan指定なら従来通り / 無ければ全予約
+    const planid = (req.query.plan !== undefined) ? req.query.plan : null;
     
-    let resdata = await sql.getReservesFromFid(fid,planid); 
+    const resdata = await sql.getReservesFromFid(fid,planid); 
 
     res.render('reserve_change', { 
       Env: Env,
       errors: errors,
       form:  req.query,
-      res: resdata
+      res: resdata || []
     });
   } catch(e) {
     errors.push(e);
@@ -1387,7 +1446,12 @@ async function reserve_change(req,res){
 async function reserve_edit(req,res){
   let errors=[];
   try{
+    let planid = req.query.plan ? Number(req.query.plan) : null;
+    const resids = req.query.resids || [];
+    
     const userdata = getUserinfos(req);
+    const fid = userdata.FID;
+
     if(!req.query.resids){
       errors.push('予約変更する人が選択されていません。変更したい人にチェックを入れて実行して下さい');
       error_render(req,res,'reserve_edit',errors);
@@ -1398,9 +1462,26 @@ async function reserve_edit(req,res){
       error_render(req,res,'reserve_edit',errors);
       return;
     }
-    const resids = req.query.resids;
-    const fid = userdata.FID;
-    
+
+    if (!planid) {
+      // 1件目からplanを推定
+      const first = await sql.getReserveInfo(resids[0], fid);
+      if (!first) { errors.push('予約情報が取得できませんでした'); /*...*/ }
+      planid = Number(first.plan);
+    }
+    // 混在チェック
+    const plans = new Set();
+    for (const id of resids) {
+      const info = await sql.getReserveInfo(id, fid);
+      if (info) plans.add(Number(info.plan));
+    }
+    if (plans.size >= 2) {
+      errors.push('異なる予防接種プランの予約を同時に変更・キャンセルすることはできません。プランごとに操作してください。');
+      // ここで reserve_change に戻す（全予約画面へ）
+      res.redirect(`${Env.https_path}?mode=reservechange`);
+      return;
+    }
+        
     if(req.query.change_act == 1){ //変更
       reserve_new_cal(req,res,1,resids);
     } else{ //削除

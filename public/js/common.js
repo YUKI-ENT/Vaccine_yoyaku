@@ -45,3 +45,27 @@ $('#fbirth').datepicker(
         startDate: '1920-01-01'
     }
 );
+// 予約確定時の警告（data-warnings を見て confirm）
+$(document).on('submit', '#reserveConfirmForm', function (e) {
+    const raw = $(this).attr('data-warnings');
+    if (!raw) return true;
+
+    let warnings = [];
+    try {
+        warnings = JSON.parse(raw);
+    } catch (err) {
+        // JSON壊れてたら安全側：確認なしで通す or 止める、どちらか選ぶ
+        // ここは「止めない」方が運用上ラクなので通す
+        console.warn('Invalid warnings JSON:', err);
+        return true;
+    }
+
+    if (Array.isArray(warnings) && warnings.length > 0) {
+        const msg = warnings.join("\n\n") + "\n\n予約を実行しますか？";
+        if (!window.confirm(msg)) {
+            e.preventDefault();
+            return false;
+        }
+    }
+    return true;
+});

@@ -9,48 +9,143 @@
                 <li class="breadcrumb-item active" aria-current="page">予約の確認・変更・キャンセル</li>
             </ol>
         </nav>
-        <div class="jumbotron">
-            <h2>予約確認</h2>
-                <% if(res.length === 0){ %> 予約がありません <% } else { %>
-                    <form action="<%= Env.https_path %>" method="get">
-                    <input type="hidden" name="mode" value="reserveedit" />
-                    <input type="hidden" name="plan" value="<%=form.plan%>" />
-                    <div class="form-check">
-                            <ul class="list-group">
-                                <% let d='', z=0; %>
-                                <% res.forEach(function(r){ %>
-                                    <% if(r.j_date != d ||  r.PT_zone !=  z){ %>
-                                        <h4 class="mt-5"><%=r.j_date%> <%=r.zonename%></h4>
-                                    <% } %>
-                                        <li class="list-group-item"> 
-                                            <% if(r.state == ''){ %>
-                                                <input type="checkbox" name="resids[]" value="<%=r.ID%>" class="form-check-input"/>
-                                            <% } %> 
-                                            <%=r.PT_name%> 様(<%=r.PT_age%>歳) <%=r.Vac_name%>回目 <%=r.state%>
-                                        </li>
-                                        <% d = r.j_date; z = r.PT_zone; %>
-                                <% }); %>
-                            </ul>
-                        
-                    </div>
-                    <div class="form-inline mt-2">
-                        <select name="change_act" class="form-control">
-                            <option value="1">予約日を変更</option>
-                            <option value="9">キャンセルする</option>
-                        </select>
-                        <input type="submit" value="次へ" class="btn btn-primary m-2"/>
-                    </div>
+        <!-- ヘッダー -->
+        <div class="jumbotron py-4">
+            <h2 class="mb-3">予約確認</h2>
+        </div>
+
+        <%
+            // res を plan_id でグルーピング
+            const groups = {};
+            (res || []).forEach(r => {
+            const pid = r.plan_id || r.plan;   // どっちでも拾える保険
+            if (!groups[pid]) groups[pid] = { plan_id: pid, plan_name: r.plan_name || '', items: [] };
+            groups[pid].items.push(r);
+            });
+
+            // 表示順（数値昇順）
+            const planIds = Object.keys(groups).sort((a,b) => Number(a) - Number(b));
+        %>
+
+        
+        
+        <% if (res.length === 0) { %>
+            <div class="alert alert-info">
+            現在、有効な予約はありません。
+            </div>
+        <% } else { %>
+            <% planIds.forEach(function(pid){ 
+                const g = groups[pid];
+                const items = g.items;
+
+                // 日付・ゾーンで見出しを出すためのワーク
+                let d = '', z = 0;
+            %>
+
+            <!-- プラン単位カード -->
+            <section class="card mb-4 shadow-sm">
+                <div class="card-header bg-light">
+                <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center">
                     <div>
-                        予約を変更・キャンセルする場合は、変更したい予約項目にチェックを入れ、上のメニューを選択し、「次へ」ボタンを押して下さい
+                    <div class="text-muted small">予防接種名</div>
+                    <div class="h5 mb-0">
+                        <span class="badge badge-primary p-2"><%= g.plan_name || ('Plan ID: ' + pid) %></span>
                     </div>
-                    <p class="text-danger">複数の予約を選択して変更すると、変更後の日付はすべて同じ日になります。異なる日付に変更を希望される場合は、一人ずつ選択して変更を行ってください</p>
+                    </div>
+                    <div class="text-muted small mt-2 mt-md-0">
+                    変更・キャンセルする予約にチェック → 下のメニューで操作
+                    </div>
+                </div>
+                </div>
+
+                <div class="card-body">
+
+                <!-- ★ここが重要：プランごとに form を分ける -->
+                <form action="<%= Env.https_path %>" method="get">
+                    <input type="hidden" name="mode" value="reserveedit" />
+                    <input type="hidden" name="plan" value="<%= pid %>" />
+
+                    <!-- 予約一覧 -->
+                    <% items.forEach(function(r){ %>
+
+                    <% if (r.j_date !== d || r.PT_zone !== z) { %>
+                        <h5 class="mt-4 border-bottom pb-2">
+                        <%= r.j_date %>　<%= r.zonename %>
+                        </h5>
+                    <% } %>
+
+                    <div class="card mb-2">
+                        <div class="card-body py-2">
+                        <div class="form-check d-flex align-items-center">
+
+                            <% if (r.state === '') { %>
+                            <input type="checkbox"
+                                    name="resids[]"
+                                    value="<%= r.ID %>"
+                                    class="form-check-input mt-0 mr-2">
+                            <% } else { %>
+                            <span class="mr-4"></span>
+                            <% } %>
+
+                            <div class="flex-grow-1">
+                            <strong><%= r.PT_name %></strong> 様
+                            （<%= r.PT_age %>歳）
+                            ／ <%= r.Vac_name %>回目
+                            </div>
+
+                            <% if (r.state) { %>
+                            <span class="badge badge-danger ml-2">
+                                <%- r.state %>
+                            </span>
+                            <% } %>
+
+                        </div>
+                        </div>
+                    </div>
+
+                    <% d = r.j_date; z = r.PT_zone; %>
+                    <% }); %>
+
+                    <!-- 操作エリア（プランごと） -->
+                    <div class="card mt-4">
+                    <div class="card-header">変更内容の選択</div>
+                    <div class="card-body">
+
+                        <div class="form-row align-items-center">
+                        <div class="col-12 col-md-6 mb-2 mb-md-0">
+                            <select name="change_act" class="form-control">
+                            <option value="1">予約日を変更する</option>
+                            <option value="9">予約をキャンセルする</option>
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <input type="submit" value="次へ" class="btn btn-primary w-100" />
+                        </div>
+                        </div>
+
+                        <ul class="text-muted mt-3 mb-0">
+                        <li>このプラン内の予約のみ操作されます。</li>
+                        <li>複数の予約を同時に変更した場合、変更後の日付はすべて同じ日になります。</li>
+                        <li class="text-danger">異なる日付に変更したい場合は、一人ずつ変更してください。</li>
+                        </ul>
+
+                    </div>
+                    </div>
+
                 </form>
-                <% } %>
+                </div>
+            </section>
+
+            <% }); %>
+        <% } %>
+
+        <!-- 戻る -->
+        <div class="mt-4">
+            <a href="#" class="btn btn-info" id="backbtn">戻る</a>
         </div>
-        <div id="navi" class="form-group">
-            <a href="#" class="btn btn-info mt-1"  role="button" id="backbtn">戻る</a>
+
         </div>
-    </div>
+
 <%- include('./footer.ejs'); %>
 
 </body>

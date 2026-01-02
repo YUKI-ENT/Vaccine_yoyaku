@@ -315,7 +315,7 @@ async function admin_cal(req, res, daymode=0, plans, errors, year = 0, month = 0
             plan: plans[planindex],
             plans: plans,
             zones: zones,
-            form:{id: planid,year: year, month:month, day:contentday},
+            form:{id: planid,year: year, month:month, day:contentday, mode: 'cal'},
             years: years,
             months: months,
             calendars: calendars,
@@ -348,7 +348,7 @@ async function admin_plan(req,res, plans, errors){
         res.render('admin_plans', { 
             Env: Env,
             errors: errors,
-            form:{id: planid},
+            form: req.query,
             plan: planid,
             plans: plans,
             rules: rules       
@@ -426,8 +426,8 @@ async function admin_planedit(req,res, plans, errors){
                 price2  : Number(req.query.price2),
                 apply   : Number(req.query.apply),
                 cancel  : Number(req.query.cancel),
-                text    : req.query.text.trim(),
-                detail  : req.query.detail,
+                text    : sanitizeAdminHtml(req.query.text),
+                detail  : sanitizeAdminHtml(req.query.detail),
                 sort    : Number(req.query.sort),
                 year    : moment(req.query.start).year(),
                 start_m : moment(req.query.start).month() + 1,
@@ -524,7 +524,7 @@ async function admin_sheet(req,res, plans, errors){
             errors: errors,
             res: reslists,
             plan: planid,
-            form:{id: planid},
+            form: req.query,
             sumi: sumi,
             total: total,
             plans: plans        
@@ -641,7 +641,7 @@ async function admin_waku(req,res, plans, errors,change = 0){
             errors: errors,
             waku: waku,
             plan: planid,
-            form:{id: planid},
+            form: req.query,
             activeplan: activeplan,
             plans: plans  ,
             zones: zones      
@@ -899,7 +899,7 @@ async function admin_pt(req,res, plans, errors){
             cal: cal,
         };
 
-        admin_cal(req, res, 2, year, month, day, ptdata);
+        admin_cal(req, res, 2, plans, errors, year, month, day, ptdata);
     } catch(e) {
         console.log('Error in admin_pt:' + e);
         errors.push('Error in admin_pt:' + e);
@@ -1205,7 +1205,8 @@ async function admin_vial(req,res, plans, errors){
             form: req.query,
             plan: planid,
             vials: vials,
-            days: days
+            days: days,
+            plans
         });
     } catch(e){
         console.log('Error in admin_vial:' + e);
@@ -1387,7 +1388,8 @@ function error_render(req, res, module_name, plans, errors){
 }
 
 function sanitizeAdminHtml(html) {
-  return sanitizeHtml(html || '', {
+  const s = (html ?? '').toString(); 
+  return sanitizeHtml(s || '', {
     allowedTags: [
       'p', 'br', 'ul', 'ol', 'li',
       'strong', 'b', 'em', 'i',

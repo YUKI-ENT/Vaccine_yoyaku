@@ -1,46 +1,104 @@
 <%- include('./header.ejs', {Env: Env}); %>
 <body>
-    <%- include('./navbar.ejs', {Env: Env}); %>
-    
-    <div id="container" class="container">
-        <nav aria-label="パンくずリスト">
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="<%= Env.https_path %>">ホーム</a></li>
-                <li class="breadcrumb-item">予約の確認・変更・キャンセル</li>
-                <li class="breadcrumb-item active" aria-current="page">削除の確認</li>
-            </ol>
-        </nav>
-        <div class="jumbotron">
-            <h2>予約削除の確認</h2>
-		    以下の予約をキャンセルします。よろしければ、下のボタンを押して下さい。
-		        <div class="form-group">
-                    <form action="<%=Env.https_path%>" method="get">
-                        <input type="hidden" name="mode" value="reservedel" />
-                        <input type="hidden" name="plan" value=<%=form.plan%> />
-                        <table class="table">
-                            <tr><th>氏名</th><th>予約日</th></tr>
-                            <% res.forEach((r) => { %>
-                                <tr>
-                                    <td>
-                                        <input type="hidden"  name="resids[]" value="<%=r.ID%>"/>
-                                        <%=r.PT_name%>
-                                    </td>
-                                    <td>
-                                        <%=r.j_date%><%=r.zonename%>
-                                    </td>
-                                </tr>
-                            <% }); %>
-                        </table>
-                        <input type="submit" value="上記の予約を削除する" id="btndel" class="btn btn-danger"/>
-                    </form> 
-                <div>
-        </div>
-        <div id="navi" class="form-group">
-            <a href="#" class="btn btn-info mt-1"  role="button" id="backbtn">戻る</a>
-        </div>
+<%- include('./navbar.ejs', {Env: Env}); %>
+
+<div id="container" class="container">
+
+  <!-- パンくず -->
+  <nav aria-label="パンくずリスト">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="<%= Env.https_path %>">ホーム</a></li>
+      <li class="breadcrumb-item">予約の確認・変更・キャンセル</li>
+      <li class="breadcrumb-item active" aria-current="page">削除の確認</li>
+    </ol>
+  </nav>
+
+  <!-- ヘッダー -->
+  <div class="jumbotron py-4">
+    <h2 class="mb-3">予約キャンセルの確認</h2>
+    <p class="mb-0">
+      以下の予約をキャンセルします。内容をご確認のうえ、問題なければ下のボタンを押してください。
+    </p>
+  </div>
+
+    <%- include('./plan_title.ejs', {
+        plan: (res && res.length > 0 && res[0].plan_name) ? { name: res[0].plan_name } : null
+    }); %>
+
+
+  <% if (!res || res.length === 0) { %>
+    <div class="alert alert-warning">
+      対象となる予約が見つかりませんでした。
     </div>
+  <% } else { %>
+
+    <!-- 対象予約一覧 -->
+    <div class="card mb-3">
+      <div class="card-header">
+        キャンセル対象の予約
+      </div>
+      <div class="card-body p-0">
+
+        <ul class="list-group list-group-flush">
+          <% res.forEach((r) => { %>
+            <li class="list-group-item">
+              <div class="d-flex justify-content-between align-items-center">
+                <div>
+                  <div class="font-weight-bold">
+                    <%= r.PT_name %> 様
+                    <% if (typeof r.PT_age !== 'undefined' && r.PT_age !== null) { %>
+                      <small class="text-muted">（<%= r.PT_age %>歳）</small>
+                    <% } %>
+                  </div>
+                  <div class="text-muted">
+                    <%= r.j_date %>　
+                    <span class="badge badge-light"><%= r.zonename %></span>
+                  </div>
+                </div>
+
+                <% if (r.Vac_name) { %>
+                  <span class="badge badge-secondary">
+                    <%= r.Vac_name %>回目
+                  </span>
+                <% } %>
+              </div>
+
+              <!-- 送信に必要な hidden -->
+              <input type="hidden" name="resids[]" value="<%= r.ID %>"/>
+            </li>
+          <% }); %>
+        </ul>
+
+      </div>
+    </div>
+
+    <!-- 実行ボタン -->
+    <form action="<%= Env.https_path %>" method="get">
+      <input type="hidden" name="mode" value="reservedel" />
+      <input type="hidden" name="plan" value="<%= form.plan %>" />
+
+      <% res.forEach((r) => { %>
+        <input type="hidden" name="resids[]" value="<%= r.ID %>"/>
+      <% }); %>
+
+      <div class="alert alert-danger">
+        <strong>注意：</strong> キャンセルを実行すると元に戻せません。
+      </div>
+
+      <div class="d-flex flex-column flex-md-row gap-2">
+        <button type="submit" id="btndel" class="btn btn-danger btn-lg mr-md-2">
+          上記の予約をキャンセルする
+        </button>
+        <a href="#" class="btn btn-outline-secondary btn-lg" id="backbtn">
+          戻る（キャンセルしない）
+        </a>
+      </div>
+    </form>
+
+  <% } %>
+
+</div>
+
 <%- include('./footer.ejs'); %>
-
 </body>
-
 </html>

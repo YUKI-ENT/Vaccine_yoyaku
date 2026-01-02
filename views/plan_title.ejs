@@ -1,0 +1,30 @@
+<% if (plan && plan.name) { %>
+  <div class="card shadow-sm mb-4">
+    <div class="card-body py-3">
+      <div class="d-flex flex-column flex-md-row align-items-md-center">
+        <div class="mr-md-3 mb-2 mb-md-0">
+          <span class="badge badge-primary p-2">
+            予防接種名
+          </span>
+        </div>
+        <div>
+          <h3 class="mb-0 font-weight-bold">
+            <%= plan.name %>
+          </h3>
+          <% if (plan.year) { %>
+            <small class="text-muted">
+              <%= plan.year %> 年度
+            </small>
+          <% } %>
+        </div>
+      </div>
+
+      <!-- <% if (plan.text) { %>
+        <hr class="my-2">
+        <div class="text-muted small">
+          <%- plan.text %>
+        </div>
+      <% } %> -->
+    </div>
+  </div>
+<% } %>

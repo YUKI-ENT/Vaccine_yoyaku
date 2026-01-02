@@ -1,62 +1,141 @@
 <%- include('./header.ejs', {Env: Env}); %>
 <body>
-    <%- include('./navbar.ejs', {Env: Env}); %>
-    
+  <%- include('./navbar.ejs', {Env: Env}); %>
 
-<div id="container" class="container">
-		<nav aria-label="パンくずリスト">
-			<ol class="breadcrumb">
-				<li class="breadcrumb-item"><a href="<%= Env.https_path %>">ホーム</a></li>
-				<li class="breadcrumb-item">新規予約(人数選択)</li>
-				<li class="breadcrumb-item">日付選択</li>
-                <li class="breadcrumb-item active" aria-current="page">日付確認</li>
-			</ol>
-		</nav>
-	<div class="jumbotron">
-        <h2>予約の確認</h2>
-        <div class="text-danger">まだ予約は確定していません。下記に間違いがなければ、確定のボタンを押してください。</div>
-        
-        <table class="table table-border">
-            <tr>
-                <th>日付</th><td><strong><%=res.year%>年<%=res.month%>月<%=res.day%>日(<%=res.youbi%>)</strong></td>
-            </tr>
-            <tr>
-                <th>時間帯</th><td><strong><%=res.zonename%></strong></td>
-            </tr>
-            <tr>
-                <th>人数</th>
-                <td><strong><%=res.num%></strong>人<br/>
-                    <ol>
-                        <% families.forEach(function(family){ %>
-                            <li><%=family.name1 + family.name2%>様(<%=family.birth%>生)</li>
-                        <% }); %>
-                    </ol>     
-                </td>
-            </tr>
-            <tr>
-                <th>変更・キャンセル</th>
-                <td><% if(plan.cancel) { %>接種日の<%=plan.cancel%>時間前まで受付<% } else { %>キャンセル時は診療時間帯にお電話ください<% } %></td>
-            </tr>
-        </table>
-        <div class="form-group">
-            <form action="<%= Env.https_path %>" method="get">
-                <input type="hidden" name="mode" value="reservenewcomplete" />
-                <input type="hidden" name="token" value="<%=token%>" />
-                <input type="hidden" name="data" value="<%=data%>" />
-                
-                <div class="form-group"><input type="submit" value="上記の内容で予約を確定する" class="btn btn-primary"/></div>
-            </form>
+  <div id="container" class="container">
+    <nav aria-label="パンくずリスト">
+      <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="<%= Env.https_path %>">ホーム</a></li>
+        <li class="breadcrumb-item">新規予約(人数選択)</li>
+        <li class="breadcrumb-item">日付選択</li>
+        <li class="breadcrumb-item active" aria-current="page">日付確認</li>
+      </ol>
+    </nav>
+
+    <div class="jumbotron py-4">
+      <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-md-between">
+        <div>
+          <h2 class="mb-1">予約の確認</h2>
+          
         </div>
+      </div>
+        <%- include('./plan_title.ejs', { plan: plan }); %>
 
-    </div>
-    <div id="navi" class="form-group">
-        <%# <a href="= Env.https_path ?mode=reservenew&amp;plan= form.plan " class="btn btn-info m-1"  role="button" id="backbtn">戻る</a> %>
-        <a href="#" class="btn btn-info m-1"  role="button" id="backbtn">戻る</a>
-    </div>
-</div>
-<%- include('./footer.ejs'); %>
+      <!-- エラー表示（errorsを渡している場合だけ） -->
+      <% if (typeof errors !== 'undefined' && errors && errors.length) { %>
+        <div class="alert alert-danger mt-3 mb-3" role="alert">
+          <ul class="mb-0">
+            <% errors.forEach(function(err){ %>
+              <li><%= err %></li>
+            <% }); %>
+          </ul>
+        </div>
+      <% } %>
 
+      <!-- 未確定アラート -->
+      <div class="alert alert-warning mt-3" role="alert">
+        <strong>まだ予約は確定していません。</strong>
+        下記に間違いがなければ、<strong>「予約を確定する」</strong>を押してください。
+      </div>
+
+      <!-- 予約内容 -->
+      <div class="card shadow-sm">
+        <div class="card-header bg-light">
+          <strong>予約内容</strong>
+        </div>
+        <div class="card-body">
+
+          <div class="table-responsive">
+            <table class="table table-bordered mb-0">
+              <tbody>
+                <tr>
+                  <th style="width: 30%;">日付</th>
+                  <td>
+                    <strong style="font-size: 1.1rem;">
+                      <%= res.year %>年<%= res.month %>月<%= res.day %>日(<%= res.youbi %>)
+                    </strong>
+                  </td>
+                </tr>
+                <tr>
+                  <th>時間帯</th>
+                  <td>
+                    <span class="badge badge-info p-2" style="font-size: 1rem;">
+                      <%= res.zonename %>
+                    </span>
+                  </td>
+                </tr>
+                <tr>
+                  <th>人数</th>
+                  <td>
+                    <span class="badge badge-primary p-2" style="font-size: 1rem;">
+                      <%= res.num %> 人
+                    </span>
+
+                    <div class="mt-3">
+                      <h6 class="mb-2">接種する方</h6>
+                      <ol class="mb-0">
+                        <% families.forEach(function(family){ %>
+                          <li>
+                            <%= family.name1 + family.name2 %> 様
+                            <span class="text-muted">（<%= family.birth %> 生）</span>
+                          </li>
+                        <% }); %>
+                      </ol>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <th>変更・キャンセル</th>
+                  <td>
+                    <% if(plan && plan.cancel) { %>
+                      接種日の <strong><%= plan.cancel %></strong> 時間前まで受付
+                    <% } else { %>
+                      キャンセル時は診療時間帯にお電話ください
+                    <% } %>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+        <div class="alert alert-danger mt-3 mb-3" role="alert">
+          <ul class="mb-0">
+            <% warnings.forEach(function(warn){ %>
+              <li><%= warn %></li>
+            <% }); %>
+          </ul>
+        </div>
+         
+          <!-- 確定ボタン -->
+          <div class="mt-4">
+            <form id="reserveConfirmForm" action="<%= Env.https_path %>" method="get"  data-warnings='<%- JSON.stringify(warnings || []) %>'>
+              <input type="hidden" name="mode" value="reservenewcomplete" />
+              <input type="hidden" name="token" value="<%= token %>" />
+              <input type="hidden" name="data" value="<%= data %>" />
+
+              <button type="submit" class="btn btn-primary btn-lg btn-block">
+                上記の内容で予約を確定する
+              </button>
+            </form>
+
+            <p class="text-muted small mt-2 mb-0">
+              ※確定後に「予約確認・変更・キャンセル」から内容を確認できます。
+            </p>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- もし plan.detail をHTMLで表示したいならここ（サーバ側でsanitize済み前提） -->
+      
+      <div id="navi" class="form-group mt-3">
+        <a href="#" class="btn btn-info m-1" role="button" id="backbtn">戻る</a>
+        <a href="<%= Env.https_path %>" class="btn btn-outline-secondary m-1" role="button">ホームへ</a>
+      </div>
+
+    </div><!-- /.jumbotron -->
+  </div><!-- /.container -->
+
+  <%- include('./footer.ejs'); %>
 </body>
-
 </html>
-
