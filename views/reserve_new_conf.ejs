@@ -97,14 +97,16 @@
               </tbody>
             </table>
           </div>
-
-        <div class="alert alert-danger mt-3 mb-3" role="alert">
-          <ul class="mb-0">
-            <% warnings.forEach(function(warn){ %>
-              <li><%= warn %></li>
-            <% }); %>
-          </ul>
-        </div>
+        
+          <% if (typeof warnings !== 'undefined' && warnings && warnings.length) { %>
+            <div class="alert alert-danger mt-3 mb-3" role="alert">
+              <ul class="mb-0">
+                <% warnings.forEach(function(warn){ %>
+                  <li><%= warn %></li>
+                <% }); %>
+              </ul>
+            </div>
+          <% } %>
          
           <!-- 確定ボタン -->
           <div class="mt-4">

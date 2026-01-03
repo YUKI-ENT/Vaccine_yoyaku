@@ -15,6 +15,7 @@ var sql=require('../bin/sql.js');
 const mail = require('../bin/mail.js');
 const crypt = require('../bin/crypt.js');
 const ejs = require('ejs');
+const Mail = require('nodemailer/lib/mailer/index.js');
 
 sql.set_log(null,0,Env.title + ' System started on port ' + Env.port);
 // var errorlists = require('../bin/errors.json');
@@ -37,7 +38,10 @@ passport.use(new LocalStrategy({
 }, async function (req, sid, birth, done) {
     try{
       if (/^\d{2,5}$/.test(String(sid)) && moment(birth, ['YYYY-MM-DD','YYYY/MM/DD','YYYYMMDD'], true).isValid()) {
-        let input_birth = moment(birth).format('YYYY-MM-DD');
+        const input_birth = normalizeBirth(birth);
+        if (!input_birth) {
+          throw new Error('生年月日の形式が不正です');
+        }
         let ptinfo = await sql.sid2ptinfo(sid); //PT_master検索
         if(ptinfo != null){
           const birthday = wareki2datestr(ptinfo.nengo, ptinfo.B_year, ptinfo.B_month, ptinfo.B_day);
@@ -86,6 +90,26 @@ passport.deserializeUser(function (user, done) {
 
 router.use(passport.initialize());
 router.use(passport.session());
+
+function normalizeBirth(birth) {
+  if (!birth) return null;
+
+  let m;
+
+  if (birth instanceof Date) {
+    m = moment(birth);
+  } else {
+    m = moment(
+      birth,
+      ['YYYY-MM-DD', 'YYYY/MM/DD', 'YYYYMMDD'],
+      true
+    );
+  }
+
+  if (!m.isValid()) return null;
+
+  return m.format('YYYY-MM-DD');
+}
 
 ///
 
@@ -140,16 +164,7 @@ router.get(Env.https_path, isAuthenticated, Validator,  async function(req, res,
       }
 
       // 3) cookieに保存する内容は「必要最小限」に絞る（巨大化・漏えいリスクを減らす）
-      const cookieUser = {
-        SID: userdata.SID ?? req.user,
-        UID: userdata.UID,
-        FID: userdata.FID,
-        // 表示に必要なら
-        name1: userdata.name1,
-        name2: userdata.name2,
-        birth: userdata.birth,   // もし持ってるなら
-        // 必要なら他も追加。ただし増やしすぎない
-      };
+      const cookieUser = buildUserInfos(userdata);
 
       try {
         const enc = crypt.getEncryptedString(JSON.stringify(cookieUser));
@@ -1059,7 +1074,8 @@ async function reserve_new_conf(req,res){
 
     //予約実行OKのTokenを発行する
     moment.locale('en');
-    const token = crypt.hashing(rdate.format());
+    const token = crypt.hashing(`${userdata.UID}:${moment().valueOf()}:${Math.random()}`);
+
     //予約データの暗号化
     const resobj = {resdata: resdata, ptuids:ptuids};
     const enc_data = crypt.getEncryptedString(JSON.stringify(resobj));
@@ -1067,11 +1083,11 @@ async function reserve_new_conf(req,res){
     //tokenの保存
     const q = 'UPDATE ' + Db.T_users + ' SET hash = ?, hashAt = cast( now() as datetime ) WHERE UID = ?';
     //const q = 'UPDATE ' + Db.T_users + ' SET hash = ? , hashAt = ? WHERE UID=  ?' ;
-    userdata.hash = token;
-    userdata.hashAt = moment().format();
+    // userdata.hash = token;
+    // userdata.hashAt = moment().format();
     const [updateresult] = await sql.pool.query(q,[token, userdata.UID]);
     //USERINFOSの更新
-    res.cookie('USERINFOS',crypt.getEncryptedString(JSON.stringify(userdata)));
+    // res.cookie('USERINFOS',crypt.getEncryptedString(JSON.stringify(userdata)));
 
     res.render('reserve_new_conf', { 
       Env: Env,
@@ -1155,7 +1171,8 @@ async function reserve_edit_conf(req,res)
 
     //予約実行OKのTokenを発行する
     moment.locale('en');
-    const token = crypt.hashing(rdate.format());
+    const token = crypt.hashing(rdate.format() + ':' + moment().valueOf() + ':' + Math.random());
+
     //予約データの暗号化
     const resobj = {newres: newres, resids:resids};
     const enc_data = crypt.getEncryptedString(JSON.stringify(resobj));
@@ -1163,11 +1180,11 @@ async function reserve_edit_conf(req,res)
     //tokenの保存
     
     const q = 'UPDATE ' + Db.T_users + ' SET hash = ? , hashAt = cast( now() as datetime ) WHERE UID=  ?' ;
-    userdata.hash = token;
-    userdata.hashAt = moment().format();
+    // userdata.hash = token;
+    // userdata.hashAt = moment().format();
     const [updateresult] = await sql.pool.query(q,[token, userdata.UID]);
     //USERINFOSの更新
-    res.cookie('USERINFOS',crypt.getEncryptedString(JSON.stringify(userdata)));
+    // res.cookie('USERINFOS',crypt.getEncryptedString(JSON.stringify(userdata)));
 
     res.render('reserve_edit_conf', { 
       Env: Env,
@@ -1185,233 +1202,306 @@ async function reserve_edit_conf(req,res)
   } 
 }
 
-async function reserve_new_complete(req,res){
+async function reserve_new_complete(req, res) {
   let errors = [];
-  try{
-    if(check_args(req.query, ['data','token']).length > 0){
+  let userdata = null;
+
+  try {
+    if (check_args(req.query, ['data', 'token']).length > 0) {
       errors.push('不正なアクセスです。トップページから操作し直してください。');
-      error_render(req,res,'reserve_new_complete',errors);
+      error_render(req, res, 'reserve_new_complete', errors);
       return;
     }
 
     const token = req.query.token;
     const data = JSON.parse(crypt.getDecryptedString(req.query.data));
+
     const planid = data.resdata.plan;
     const year = data.resdata.year;
     const month = data.resdata.month;
     const day = data.resdata.day;
     const zoneid = data.resdata.zoneid;
-    const ptuids = data.ptuids; //null?? resids?
+    const ptuids = data.ptuids;
+
     const plandata = await sql.getPlan(planid);
     const maxDoses = await sql.getPlanMaxDoses(planid);
 
-    const userdata = getUserinfos(req);
+    userdata = getUserinfos(req);
+    if (!userdata) {
+      errors.push('ログイン情報が確認できません。トップページから操作し直してください。');
+      error_render(req, res, 'reserve_new_complete', errors);
+      return;
+    }
     const ptuid = userdata.UID;
-    
-    //Tokenの確認
-    const tokenresult = await sql.check_token(ptuid,token,1);
-    if(!tokenresult){
+    const fid = userdata.FID; // ★追加：未定義バグ修正
+
+    // Token確認
+    const tokenresult = await sql.check_token(ptuid, token, 1);
+    if (!tokenresult) {
       errors.push('予約データが正しくありません。予約実行ボタンを複数回押してしまった可能性があります。予約確認のページから予約が正しく取れているか確認の上、操作し直してください。');
-      error_render(req,res,'reserve_new_complete',errors);
+      error_render(req, res, 'reserve_new_complete', errors);
       return;
     }
 
-    //再度枠空き確認
+    // 再度枠空き確認
     const num = ptuids.length;
-    const strdate = moment([year,month-1,day]).format('YYYY-MM-DD');
-    const akinum = await sql.getAkiWaku(strdate,zoneid,planid);
+    const strdate = moment([year, month - 1, day]).format('YYYY-MM-DD');
+    const akinum = await sql.getAkiWaku(strdate, zoneid, planid);
     if (akinum < num) {
-          errors.push('申し訳ございませんが予約日は満員です。他の利用者が、少し前に予約を実行された可能性があります。日付を変更して予約しなおしてください');
-          error_render(req,res,'reserve_new_complete',errors);
-          return;
-    }
-   
-    //Total vial上限超え→当日のvialが増えなければ予約実行
-    const p_vialml = sql.getReservedVialMl(planid,plandata);
-    const p_required_ml = sql.getRequiredMl(plandata,moment([year,month-1,day]),ptuids);
-    const vialml = await p_vialml;
-    const required_ml = await p_required_ml;
-
-    const newvials = (strdate in vialml) ? Math.ceil((vialml[strdate].ml + required_ml)/ plandata.mlpervial) - vialml[strdate].vial : Math.ceil(required_ml / plandata.mlpervial);
-    if(newvials > 0 && vialml.total_vial + newvials > plandata.vial){
-      errors.push('申し訳ございませんがワクチン予約数が上限に達したため予約を完了できませんでした。他の利用者が、少し前に予約を実行された可能性があります。端数のある日に予約が可能な場合がありますので、人数、日付を変更して予約しなおしてみてください');
-      error_render(req,res,'reserve_new_complete',errors);
+      errors.push('申し訳ございませんが予約日は満員です。他の利用者が、少し前に予約を実行された可能性があります。日付を変更して予約しなおしてください');
+      error_render(req, res, 'reserve_new_complete', errors);
       return;
     }
-    
-    //接種時年齢計算、接種量決定
-    const halfdoseage = parseFloat(plandata.halfdoseage);
-    //予約データ準備
-    let ptuser = {}, age =0, volume = 0, d = [], nowait =[],resinfos=[];
-    for(let i=0;i<num;i++){ 
-      ptuser = await sql.uid2ptinfo(ptuids[i]);
-      //接種時年齢計算、接種量決定
-      age = sql.calcAge(moment(ptuser.birth), moment([year,month-1,day]));
-      volume =(age < halfdoseage) ? parseFloat(plandata.std_dose)*0.5 : parseFloat(plandata.std_dose);
 
-      d.push([ptuids[i],ptuser.FID,planid,strdate,zoneid,ptuser.name1 + ptuser.name2,ptuser.SID,age,ptuser.birth,volume,moment().format('YYYY-MM-DD HH:mm:ss.SS')]);
-      resinfos.push({PT_name: ptuser.name1 + ptuser.name2, PT_date: strdate, SID: ptuser.SID});
+    // Total vial上限チェック
+    const vialml = await sql.getReservedVialMl(planid, plandata);
+    const required_ml = await sql.getRequiredMl(plandata, moment([year, month - 1, day]), ptuids);
+
+    const newvials = (strdate in vialml)
+      ? Math.ceil((vialml[strdate].ml + required_ml) / plandata.mlpervial) - vialml[strdate].vial
+      : Math.ceil(required_ml / plandata.mlpervial);
+
+    if (newvials > 0 && vialml.total_vial + newvials > plandata.vial) {
+      errors.push('申し訳ございませんがワクチン予約数が上限に達したため予約を完了できませんでした。他の利用者が、少し前に予約を実行された可能性があります。端数のある日に予約が可能な場合がありますので、人数、日付を変更して予約しなおしてみてください');
+      error_render(req, res, 'reserve_new_complete', errors);
+      return;
     }
-    //予約実行
-    let q = 'INSERT INTO ' + Db.T_reserve + ' (UID,FID,plan,PT_date,PT_zone,PT_name,PT_ID,PT_age,PT_birth,Vac_volume,Y_date) VALUES ? ';
 
-    let [reserveresult] = await sql.pool.query(q,[d]);
+    // 予約データ準備
+    const halfdoseage = parseFloat(plandata.halfdoseage);
+    let d = [];
+    let resinfos = [];
 
-    res.render('reserve_new_complete', { 
+    for (let i = 0; i < num; i++) {
+      const ptuser = await sql.uid2ptinfo(ptuids[i]);
+
+      const age = sql.calcAge(moment(ptuser.birth), moment([year, month - 1, day]));
+      const volume = (age < halfdoseage) ? parseFloat(plandata.std_dose) * 0.5 : parseFloat(plandata.std_dose);
+
+      d.push([
+        ptuids[i],
+        ptuser.FID,
+        planid,
+        strdate,
+        zoneid,
+        ptuser.name1 + ptuser.name2,
+        ptuser.SID,
+        age,
+        ptuser.birth,
+        volume,
+        moment().format('YYYY-MM-DD HH:mm:ss.SS')
+      ]);
+
+      resinfos.push({ PT_name: ptuser.name1 + ptuser.name2, PT_date: strdate, SID: ptuser.SID });
+    }
+
+    // 予約実行
+    const q = `INSERT INTO ${Db.T_reserve} (UID,FID,plan,PT_date,PT_zone,PT_name,PT_ID,PT_age,PT_birth,Vac_volume,Y_date) VALUES ?`;
+    await sql.pool.query(q, [d]);
+
+    // ★画面を返す（ここまでが本処理）
+    res.render('reserve_new_complete', {
       Env: Env,
       errors: errors,
       plan: plandata,
       planid: planid,
-      form:  req.query,
-      maxDoses 
+      form: req.query,
+      maxDoses
     });
 
-    //接種回数設定
-    for(let i=0;i<num;i++){
-        nowait[i] = sql.set_vac_name(ptuids[i], planid);
-    }
-    //ログ
-    for(let resinfo of resinfos){
-      sql.set_log(req,resinfo.SID,'新規予約' + resinfo.PT_name + ':' + strdate);
-    }
-    let wait = [];
-    for(let i=0;i<nowait.length;i++){
-        wait[i] = await nowait[i];
-    }
+    // -----------------------
+    // 以降は後処理（失敗しても画面は返してるので error_render しない）
+    // -----------------------
+    (async () => {
+      try {
+        // 接種回数設定（並列）
+        await Promise.all(ptuids.map(u => sql.set_vac_name(u, planid).catch(() => null)));
 
-    //メール送信
-    const reslists = await sql.getReservesFromFid(userdata.FID,planid);
-    moment.locale('ja');
-    if(userdata.email){
-      ejs.renderFile('./views/mailtemp_edit.ejs', {
-        ptname: userdata.name1 + userdata.name2,
-        plandata: plandata,
-        res: resinfos,
-        resdate: moment(strdate).format('YYYY年M月D日(dddd)'),
-        reslists: reslists,
-        zonename: data.resdata.zonename
-      },function(err,text){
-        if(err) console.log(err);
-        mail.sendmail('予約完了',userdata.email,text);
-        console.log("Sent a complete mail to " + userdata.email);
-      });
-    }
-    
-  } catch(e) {
+        // ログ
+        for (let ri of resinfos) {
+          try { sql.set_log(req, ri.SID, '新規予約' + ri.PT_name + ':' + strdate); } catch (e) { console.log(e); }
+        }
+
+        // メール送信
+        const reslists = await sql.getReservesFromFid(fid); // すべての予約
+
+        moment.locale('ja');
+        const userdb = await sql.uid2ptinfo(ptuid);
+        const email = userdb?.email;
+        if (!email) return;
+
+        const planName = plandata?.name || plandata?.planname || plandata?.title || '';
+        const subject = planName ? `予約完了（${planName}）` : '予約完了';
+
+        ejs.renderFile('./views/mailtemp_edit.ejs', {
+          Mail: Mail,
+          ptname: (userdata.name1 || userdb.name1 || '') + (userdata.name2 || userdb.name2 || ''),
+          plandata: plandata,
+          res: resinfos,
+          resdate: moment(strdate).format('YYYY年M月D日(dddd)'),
+          reslists: reslists,
+          zonename: data.resdata.zonename
+        }, function (err, text) {
+          if (err) { console.log(err); return; }
+          mail.sendmail(subject, email, text);
+          console.log("Sent a complete mail to " + email);
+        });
+
+      } catch (e) {
+        console.log('post-process error in reserve_new_complete:', e);
+      }
+    })();
+
+  } catch (e) {
     errors.push(e);
-    error_render(req,res,'reserve_new_complete',errors);
-  } 
+    if (res.headersSent) {
+      console.log('reserve_new_complete error after headers sent:', e);
+      return;
+    }
+    error_render(req, res, 'reserve_new_complete', errors);
+  }
 }
 
-async function reserve_edit_complete(req,res){
+
+async function reserve_edit_complete(req, res) {
   let errors = [];
-  try{
-    const userdata = getUserinfos(req);
-    //引数チェック
-    args = ['token','data'];
-    if(check_args(req.query,args).length > 0 || !userdata)  {
-        errors.push('不正なアクセスです。もう一度トップページから操作し直してみてください。');
-        error_render(req,res,'reserve_new_cal',errors);
-        return;
+  let userdata = null;
+
+  try {
+    userdata = getUserinfos(req);
+
+    const args = ['token', 'data'];
+    if (check_args(req.query, args).length > 0 || !userdata) {
+      errors.push('不正なアクセスです。もう一度トップページから操作し直してみてください。');
+      error_render(req, res, 'reserve_edit_complete', errors);
+      return;
     }
 
     const data = JSON.parse(crypt.getDecryptedString(req.query.data));
     const token = req.query.token;
 
     const planid = data.newres.plan;
-    const year   = data.newres.year;
-    const month  = data.newres.month;
-    const day    = data.newres.day;
+    const year = data.newres.year;
+    const month = data.newres.month;
+    const day = data.newres.day;
     const zoneid = data.newres.zoneid;
     const resids = data.resids;
+
     const plandata = await sql.getPlan(planid);
+
     const fid = userdata.FID;
-    
     const ptuid = userdata.UID;
 
-    //Tokenの確認
-    const tokenresult = await sql.check_token(ptuid,token,1);
-    if(!tokenresult){
+    // Token確認
+    const tokenresult = await sql.check_token(ptuid, token, 1);
+    if (!tokenresult) {
       errors.push('予約データが正しくありません。予約実行ボタンを複数回押してしまった可能性があります。予約一覧ページから予約が正しく取れているか確認の上、操作し直してください。');
-      error_render(req,res,'reserve_edit_complete',errors);
+      error_render(req, res, 'reserve_edit_complete', errors);
       return;
     }
 
-    //再度枠空き確認
+    // 再度枠空き確認
     const num = resids.length;
-    const strdate = moment([year,month-1,day]).format('YYYY-MM-DD');
-    const akinum = await sql.getAkiWaku(strdate,zoneid,planid);
-    
+    const strdate = moment([year, month - 1, day]).format('YYYY-MM-DD');
+    const akinum = await sql.getAkiWaku(strdate, zoneid, planid);
+
     if (akinum < num) {
       errors.push('申し訳ございませんが、変更先予約日は満員です。他の利用者が、少し前に予約を実行された可能性があります。日付を変更して変更操作しなおしてください');
-      error_render(req,res,'reserve_edit_complete',errors);
+      error_render(req, res, 'reserve_edit_complete', errors);
       return;
     }
 
-    //重複の確認
-    //3回以上の予約でないかチェック
-
-    //予約データ準備
-    let age =0, volume = 0, d = [],resinfos = [], updatepromises=[];
-    //接種時年齢計算、接種量決定
+    // 予約変更本体
     const halfdoseage = parseFloat(plandata.halfdoseage);
+    const q = `UPDATE ${Db.T_reserve}
+               SET PT_date = ?, PT_zone = ?, PT_age = ?, Vac_volume = ?, PT_memo = ?
+               WHERE ID = ? AND FID = ?`;
 
-    let q = 'UPDATE ' + Db.T_reserve + ' SET PT_date = ?, PT_zone = ?, PT_age = ?, Vac_volume = ?, PT_memo = ? WHERE ID = ? AND FID = ?';
-    for(let resid of resids){ 
-      let resinfo  =  await sql.getReserveInfo(resid);
-      age = sql.calcAge(moment(resinfo.PT_birth), moment([year,month-1,day]));
-      volume =(age < halfdoseage) ? parseFloat(plandata.std_dose)*0.5 : parseFloat(plandata.std_dose);
-      let memo = resinfo.PT_memo + resinfo.PT_date + "から変更(" + moment().format() + ")/";
+    let resinfos = [];
+    let updatepromises = [];
+
+    for (let resid of resids) {
+      const resinfo = await sql.getReserveInfo(resid);
+
+      const age = sql.calcAge(moment(resinfo.PT_birth), moment([year, month - 1, day]));
+      const volume = (age < halfdoseage) ? parseFloat(plandata.std_dose) * 0.5 : parseFloat(plandata.std_dose);
+
+      const memo = (resinfo.PT_memo || '') +
+        `${moment(resinfo.PT_date).format('YYYY-MM-DD')}から変更(${moment().format()})/`;
+
       resinfos.push(resinfo);
-      //予約変更実行
-      updatepromises.push(sql.pool.query(q,[strdate,zoneid,age,volume,memo,resid,fid]));
-    }
-    for(let p of updatepromises){
-      let [reserveresult] = await p;
-      if(reserveresult.changedRows === 0) errors.push('一部の予約変更に失敗しました。予約の変更メニューをご確認ください。');
+
+      updatepromises.push(
+        sql.pool.query(q, [strdate, zoneid, age, volume, memo, resid, fid])
+      );
     }
 
-    res.render('reserve_edit_complete', { 
+    for (const p of updatepromises) {
+      const [r] = await p;
+      if (r.changedRows === 0) {
+        errors.push('一部の予約変更に失敗しました。予約の変更メニューをご確認ください。');
+      }
+    }
+
+    // ★画面を返す（ここまでが本処理）
+    res.render('reserve_edit_complete', {
       Env: Env,
       errors: errors,
       plan: plandata,
       planid: planid,
-      form:  req.query
+      form: req.query
     });
 
-    //接種回数設定//ログ
-    let nowait = [];
-    for(let resinfo of resinfos){
-        nowait.push(sql.set_vac_name(resinfo.UID, planid));
-        sql.set_log(req,resinfo.PT_ID,'予約変更' + resinfo.PT_name + ':' + strdate);
-    }
+    // -----------------------
+    // 以降は後処理：失敗しても画面は返してるので error_render しない
+    // -----------------------
+    (async () => {
+      try {
+        // 接種回数設定 + ログ（並列寄り）
+        await Promise.all(resinfos.map(async (ri) => {
+          try { sql.set_vac_name(ri.UID, planid); } catch (e) { console.log(e); }
+          try { sql.set_log(req, ri.PT_ID, '予約変更' + ri.PT_name + ':' + strdate); } catch (e) { console.log(e); }
+        }));
 
-    let wait = [];
-    for(let i=0;i<nowait.length;i++){
-        wait[i] = await nowait[i];
-    }
+        // メール送信
+        const reslists = await sql.getReservesFromFid(fid); //すべての予約
 
-    //メール送信
-    const reslists = await sql.getReservesFromFid(fid,planid);
-    moment.locale('ja');
-    if(userdata.email){
-      ejs.renderFile('./views/mailtemp_edit.ejs', {
-        ptname: userdata.name1 + userdata.name2,
-        plandata: plandata,
-        res: resinfos,
-        resdate: moment(strdate).format('YYYY年M月D日(dddd)'),
-        reslists:reslists,
-        zonename: data.newres.zonename
-      },function(err,data){
-        if(err) console.log(err);
-        mail.sendmail('予約日変更完了',userdata.email,data);
-        console.log("Sent a complete mail to " + userdata.email);
-      });
-    }
-  } catch(e) {
+        moment.locale('ja');
+        const userdb = await sql.uid2ptinfo(ptuid);
+        const email = userdb?.email;
+        if (!email) return;
+
+        const planName = plandata?.name || plandata?.planname || plandata?.title || '';
+        const subject = planName ? `予約日変更完了（${planName}）` : '予約日変更完了';
+
+        ejs.renderFile('./views/mailtemp_edit.ejs', {
+          ptname: (userdata.name1 || userdb.name1 || '') + (userdata.name2 || userdb.name2 || ''),
+          plandata: plandata,
+          res: resinfos,
+          resdate: moment(strdate).format('YYYY年M月D日(dddd)'),
+          reslists: reslists,
+          zonename: data.newres.zonename  // ★修正：data.resdata → data.newres
+        }, function (err, text) {
+          if (err) { console.log(err); return; }
+          mail.sendmail(subject, email, text);
+          console.log("Sent a complete mail to " + email);
+        });
+
+      } catch (e) {
+        console.log('post-process error in reserve_edit_complete:', e);
+      }
+    })();
+
+  } catch (e) {
     errors.push(e);
-    error_render(req,res,'reserve_edit_complete',errors);
-  } 
+
+    // 画面返却済みなら二重レスポンスしない
+    if (res.headersSent) {
+      console.log('reserve_edit_complete error after headers sent:', e);
+      return;
+    }
+    error_render(req, res, 'reserve_edit_complete', errors);
+  }
 }
 
 
@@ -1506,118 +1596,171 @@ async function reserve_edit(req,res){
   }
 }
 
-async function reserve_del_complete(req,res){
+async function reserve_del_complete(req, res) {
   let errors = [];
-  try{
-    const userdata = getUserinfos(req);
-    if(check_args(req.query, ['plan','resids']).length > 0 ||!userdata) {
+  let userdata = null;
+
+  try {
+    userdata = getUserinfos(req);
+    if (check_args(req.query, ['plan', 'resids']).length > 0 || !userdata) {
       errors.push('不正なアクセスです。トップページから操作し直してみてください。');
-      error_render(req,res,'reserve_edit',errors);
+      error_render(req, res, 'reserve_del_complete', errors);
       return;
     }
-    //FID, plan(年度) GET
+
     const fid = userdata.FID;
-    const planid = parseInt(req.query.plan);
-    const resids=req.query.resids;
-    
-    const q = 'UPDATE ' +Db.T_reserve + ' SET Del = 1  WHERE (FID = ? ) AND (ID = ?)';
+    const planid = parseInt(req.query.plan, 10);
+    const resids = req.query.resids;
 
-    let updatepromises = [], updateresults = [];
-    let ptuidspromises = [], ptuids = [];
-    for(let resid of resids){
-      updatepromises.push(sql.pool.query(q,[fid,resid]));
+    const q = `UPDATE ${Db.T_reserve} SET Del = 1 WHERE (FID = ?) AND (ID = ?)`;
+
+    let updatepromises = [];
+    let ptuidspromises = [];
+
+    for (let resid of resids) {
+      updatepromises.push(sql.pool.query(q, [fid, resid]));
       ptuidspromises.push(sql.resid2uid(resid));
-      sql.set_log(req,userdata.SID,'予約削除:' + resid);
-    }
-    for(let i=0;i<updatepromises.length;i++){
-      updateresults[i] = await updatepromises[i];
-      ptuids.push(await ptuidspromises[i]);
-      if(updateresults[i].changedRows === 0) errors.push('一部の予約が削除できませんでした。もう一度予約の変更メニューから操作し直してみてください。');
+      sql.set_log(req, userdata.SID, '予約削除:' + resid);
     }
 
-    res.render('reserve_del_complete', { 
+    let ptuids = [];
+
+    for (let i = 0; i < updatepromises.length; i++) {
+      const [r] = await updatepromises[i];        // ★ changedRows を正しく取る
+      const ptuid = await ptuidspromises[i];
+      ptuids.push(ptuid);
+
+      if (r.changedRows === 0) {
+        errors.push('一部の予約が削除できませんでした。もう一度予約の変更メニューから操作し直してみてください。');
+      }
+    }
+
+    // 画面はここで返す（ここまでが“本処理”）
+    res.render('reserve_del_complete', {
       Env: Env,
       errors: errors,
-      form:  req.query
+      form: req.query
     });
 
-    //Vac_name計算
-    for(let ptuid of ptuids){
-      sql.set_vac_name(ptuid,planid);
-    }
+    // -----------------------
+    // 以降は“後処理”：失敗しても画面は返してるので error_render しない
+    // -----------------------
+    (async () => {
+      try {
+        // Vac_name計算（await しないなら並列でOK）
+        for (let ptuid of ptuids) {
+          try { sql.set_vac_name(ptuid, planid); } catch (e) { console.log(e); }
+        }
 
-    //メール送信
-    moment.locale('ja');
-    const reslists = await sql.getReservesFromFid(fid,planid);
-    
-    if(userdata.email){
-      let resinfos =[];
-      for(let resid of resids){
-        let resinfo = await sql.getReserveInfo(resid);
-        resinfo.j_date = moment(resinfo.PT_date).format('YYYY年M月D日(dddd)');
-        resinfos.push(resinfo);
+        // メール送信
+        moment.locale('ja');
+        const reslists = await sql.getReservesFromFid(fid); //すべての予約
+
+        const userdb = await sql.uid2ptinfo(userdata.UID);  // ★ここ修正（ptuid→userdata.UID）
+        const email = userdb?.email;
+        if (!email) return;
+
+        let resinfos = [];
+        for (let resid of resids) {
+          let resinfo = await sql.getReserveInfo(resid);
+          resinfo.j_date = moment(resinfo.PT_date).format('YYYY年M月D日(dddd)');
+          resinfos.push(resinfo);
+        }
+
+        ejs.renderFile('./views/mailtemp_delete.ejs', {
+          ptname: userdata.name1 + userdata.name2,
+          reslists: reslists,
+          res: resinfos
+        }, function (err, text) {
+          if (err) {
+            console.log(err);
+            return;
+          }
+          mail.sendmail('キャンセル完了', email, text);
+          console.log("Sent a complete mail to " + email);
+        });
+
+      } catch (e) {
+        console.log('post-process error in reserve_del_complete:', e);
       }
-      ejs.renderFile('./views/mailtemp_delete.ejs', {
-        ptname: userdata.name1 + userdata.name2,
-        reslists:reslists,
-        res: resinfos
-      },function(err,data){
-        if(err) console.log(err);
-        mail.sendmail('キャンセル完了',userdata.email,data);
-        console.log("Sent a complete mail to " + userdata.email);
-      });
-    }
-  } catch(e) {
-    errors.push(e);
-    error_render(req,res,'reserve_del_complete',errors);
-  } 
-}
+    })();
 
-async function mail_form(req,res){
-  let errors=[];
-  try{
-    let userdata =getUserinfos(req);
-    //メール登録があれば、削除、変更メニュー、なければ新規登録メニュー
-    if(!userdata){
-      errors.push('不正なアクセスです。トップページから操作し直してください。');
-      error_render(req,res,'mail_form',errors);
+  } catch (e) {
+    // ここに来た時点で、render済みの可能性があるのでガード
+    errors.push(e);
+    if (res.headersSent) {
+      console.log('reserve_del_complete error after headers sent:', e);
       return;
     }
-    
-    userdata.registed = (userdata.email) ? true : false;
-     
-    res.render('mail_form', { 
+    error_render(req, res, 'reserve_del_complete', errors);
+  }
+}
+
+
+async function mail_form(req, res) {
+  let errors = [];
+  try {
+    const cookieUser = getUserinfos(req);
+    if (!cookieUser) {
+      errors.push('不正なアクセスです。トップページから操作し直してください。');
+      error_render(req, res, 'mail_form', errors);
+      return;
+    }
+
+    // email等はDBから毎回取る
+    const userdata = await sql.uid2ptinfo(cookieUser.UID);
+    if (!userdata) {
+      errors.push('セッションの有効期限が切れました。もう一度ログインし直してください。');
+      error_render(req, res, 'mail_form', errors);
+      return;
+    }
+
+    userdata.registed = !!userdata.email;
+
+    res.render('mail_form', {
       Env: Env,
-      form:  req.query,
+      form: req.query,
       ptdata: userdata
     });
-  }catch(e) {
+  } catch (e) {
     errors.push(e);
-    error_render(req,res,'mail_form',errors);
-  } 
+    error_render(req, res, 'mail_form', errors);
+  }
 }
+
 
 async function mail_regist(req,res){
   let errors=[];
   try{
-    let userdata = getUserinfos(req);
+    const cookieUser = getUserinfos(req);
+    if (!cookieUser) {
+      errors.push('不正なアクセスです。トップページから操作し直してください。');
+      error_render(req, res, 'mail_form', errors);
+      return;
+    }
+
+    // email等はDBから毎回取る
+    const userdata = await sql.uid2ptinfo(cookieUser.UID);
+    if (!userdata) {
+      errors.push('セッションの有効期限が切れました。もう一度ログインし直してください。');
+      error_render(req, res, 'mail_form', errors);
+      return;
+    }
+    
     if(check_args(req.query,['email']).length > 0){
       errors.push('メールアドレスが入力されていません');
       error_render(req,res,'mail_regist',errors);
       return;
-    } else if(!userdata){
-      errors.push('セッションの有効期限が切れました。もう一度ログインし直してください。');
-      error_render(req,res,'mail_regist',errors);
-      return;
     }
+
     const ptuid = userdata.UID;
     const email = req.query.email;
     let token = ('000000' + parseInt(Math.random() * 1000000)).slice(-6);
     
     let mes = 'ゆうき耳鼻咽喉科ワクチン予約システムのメールアドレス登録手続きいただきありがとうございます。\n'
               + '下記の数字6桁の認証コードを入力してください。\n'
-              + '10分以上経過しますと認証コードは無効となりますので、再度メールアドレスの仮登録手続きから操作し直してください。\n';
-    mes += '認証コード: ' + token + '\n'; 
+              + '10分以上経過しますと認証コードは無効となりますので、再度メールアドレスの仮登録手続きから操作し直してください。\n\n';
+    mes += '認証コード: ' + token + '\n\n'; 
     mes += '本メールに心当たりのない方は、お手数ですが、ゆうき耳鼻咽喉科 <vaccine@yuuki-jibika.com> までご連絡ください。';
 
     mail.sendmail('本登録認証用コードのご連絡', email,mes);
@@ -1635,7 +1778,7 @@ async function mail_regist(req,res){
       return;
     }
     //USERINFOSの更新
-    res.cookie('USERINFOS',crypt.getEncryptedString(JSON.stringify(userdata)));
+    // res.cookie('USERINFOS',crypt.getEncryptedString(JSON.stringify(userdata)));
 
     res.render('mail_sent', { 
       Env: Env,
@@ -1662,9 +1805,9 @@ async function mail_delete(req,res){
     const ptuid = userdata.UID;
     
     const q = 'UPDATE ' + Db.T_users + ' SET email = null, hash = null, hashAt = null WHERE UID = ?';
-    userdata.hash = '';
-    userdata.email = '';
-    userdata.registed = false;
+    // userdata.hash = '';
+    // userdata.email = '';
+    // userdata.registed = false;
 
    // userdata.hashAt = moment().format('YYYY-MM-DD HH:mm:ss');
     const [result] = await sql.pool.query(q,[ptuid]);
@@ -1674,7 +1817,7 @@ async function mail_delete(req,res){
       return;
     }
     //USERINFOSの更新
-    res.cookie('USERINFOS',crypt.getEncryptedString(JSON.stringify(userdata)));
+    // res.cookie('USERINFOS',crypt.getEncryptedString(JSON.stringify(userdata)));
      
     res.render('mail_delete_comp', { 
       Env: Env,
@@ -1715,8 +1858,8 @@ async function mail_auth(req,res){
       
       if(result.affectedRows > 0){
         //USERINFOSの更新
-        userdata.email = email;
-        res.cookie('USERINFOS',crypt.getEncryptedString(JSON.stringify(userdata)));
+        // userdata.email = email;
+        // res.cookie('USERINFOS',crypt.getEncryptedString(JSON.stringify(userdata)));
 
         res.render('mail_auth', { 
           Env: Env,
@@ -1821,5 +1964,18 @@ function getUserinfos(req){
   const userdata = JSON.parse(crypt.getDecryptedString(req.cookies.USERINFOS));
   return userdata;
 }
+
+function buildUserInfos(userdata) {
+  return {
+    UID: userdata.UID,
+    FID: userdata.FID,
+    SID: userdata.SID,
+    name1: userdata.name1,
+    name2: userdata.name2,
+    main: userdata.main ?? 0
+    // emailは入れない
+  };
+}
+
 
 module.exports = router;

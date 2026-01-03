@@ -474,6 +474,7 @@ async function getReservesFromFid(fid, planid = null) {
       INNER JOIN ${Db.T_plans} p ON r.plan = p.id
       WHERE r.FID = ?
         AND r.Del = 0
+        AND r.PT_date >= CURDATE()
     `;
     const params = [fid];
 

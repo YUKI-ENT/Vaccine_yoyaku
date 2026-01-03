@@ -5,15 +5,15 @@
 ■ 下記の予約のキャンセルを受け付けましたのでご確認ください。
 ━━━━━━━━━━━━━━━━━━━━
 【変更内容】
-<% res.forEach(function(r){ %><%= r.PT_name + '様 ' + r.j_date + r.zonename + ': キャンセルしました'%> 
+<% res.forEach(function(r){ %>▼ <%= r.PT_name + '様 ' + r.plan_name + ':' +  r.j_date + r.zonename + '\n  → キャンセルしました'%> 
 <% }); %>
 ━━━━━━━━━━━━━━━━━━━━
 
 ■ 現在の予約一覧
 ━━━━━━━━━━━━━━━━━━━━
 <% if(reslists.length === 0){ %> 予約がありません <% } else { %><% let d='',z='';reslists.forEach(function(r){ %><% if(r.j_date != d || r.PT_zone != z){ %>
-▼<%=r.j_date%> <%=r.zonename%><% } %>
-    <%=r.PT_name%> 様(<%=r.PT_age%>歳) <%=r.Vac_name%>回目 <%=r.state%><% d = r.j_date; z = r.PT_zone; %><% });} %> 
+▼ <%=r.j_date%> <%=r.zonename%><% } %>
+    <%=r.PT_name%> 様(<%=r.PT_age%>歳) <%= r.plan_name %> <%=r.Vac_name%>回目 <%=r.state%><% d = r.j_date; z = r.PT_zone; %><% });} %> 
 ━━━━━━━━━━━━━━━━━━━━
 
 ※ゆうき耳鼻咽喉科ワクチン予約システム
