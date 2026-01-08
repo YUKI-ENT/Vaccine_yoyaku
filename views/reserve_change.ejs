@@ -15,6 +15,33 @@
         </div>
 
         <%
+        const showPast = (form && (form.showpast === '1' || form.showpast === 'on')) ? true : false;
+        %>
+
+        <form method="get" action="<%= Env.https_path %>" class="mb-3" id="showpastForm">
+        <input type="hidden" name="mode" value="reservechange" />
+        <% if (form && form.plan) { %>
+            <input type="hidden" name="plan" value="<%= form.plan %>" />
+        <% } %>
+
+        <div class="d-flex justify-content-end">
+            <div class="custom-control custom-switch">
+            <input
+                type="checkbox"
+                class="custom-control-input"
+                id="showpast"
+                name="showpast"
+                value="1"
+                <%= showPast ? 'checked' : '' %>
+            >
+            <label class="custom-control-label text-muted" for="showpast">
+                過去の予約も表示
+            </label>
+            </div>
+        </div>
+        </form>
+
+        <%
             // res を plan_id でグルーピング
             const groups = {};
             (res || []).forEach(r => {
@@ -27,16 +54,40 @@
             const planIds = Object.keys(groups).sort((a,b) => Number(a) - Number(b));
         %>
 
-        
-        
-        <% if (res.length === 0) { %>
+        <%
+            const totalFuture = planIds.reduce((acc, pid) => {
+                const it = groups[pid].items || [];
+                const today0 = new Date(); today0.setHours(0,0,0,0);
+                return acc + it.filter(r => r.PT_date && new Date(r.PT_date) >= today0).length;
+            }, 0);
+        %>
+
+        <% if ((res || []).length === 0 || totalFuture === 0) { %>
             <div class="alert alert-info">
-            現在、有効な予約はありません。
+                <% if ((res || []).length === 0) { %>
+                現在、有効な予約はありません。
+                <% } else { %>
+                予約はありません。<% if (!showPast) { %>（必要なら「過去の予約も表示」をONにしてください）<% } %>
+                <% } %>
             </div>
         <% } else { %>
             <% planIds.forEach(function(pid){ 
                 const g = groups[pid];
                 const items = g.items;
+
+                  // “今日の00:00” で過去/未来を分ける（当日分は未来側に残る）
+                const today0 = new Date();
+                today0.setHours(0,0,0,0);
+
+                const futureItems = items.filter(r => {
+                    const dt = r.PT_date ? new Date(r.PT_date) : null;
+                    return dt && dt >= today0;
+                });
+
+                const pastItems = items.filter(r => {
+                    const dt = r.PT_date ? new Date(r.PT_date) : null;
+                    return dt && dt < today0;
+                });
 
                 // 日付・ゾーンで見出しを出すためのワーク
                 let d = '', z = 0;
@@ -65,8 +116,8 @@
                     <input type="hidden" name="mode" value="reserveedit" />
                     <input type="hidden" name="plan" value="<%= pid %>" />
 
-                    <!-- 予約一覧 -->
-                    <% items.forEach(function(r){ %>
+                    <!-- 予約一覧（未来） -->
+                    <% futureItems.forEach(function(r){ %>
 
                     <% if (r.j_date !== d || r.PT_zone !== z) { %>
                         <h5 class="mt-4 border-bottom pb-2">
@@ -105,6 +156,51 @@
 
                     <% d = r.j_date; z = r.PT_zone; %>
                     <% }); %>
+
+                    <% if (showPast && pastItems.length > 0) { %>
+                    <details class="mt-4">
+                        <summary class="text-muted">
+                        過去の予約（<%= pastItems.length %>件）を表示
+                        </summary>
+
+                        <div class="mt-2">
+                        <% 
+                            // 過去側も見出し（日付・ゾーン）を出す
+                            let pd = '', pz = 0; 
+                        %>
+
+                        <% pastItems.forEach(function(r){ %>
+
+                            <% if (r.j_date !== pd || r.PT_zone !== pz) { %>
+                            <h6 class="mt-3 border-bottom pb-1 text-muted">
+                                <%= r.j_date %>　<%= r.zonename %>
+                            </h6>
+                            <% } %>
+
+                            <div class="card mb-2">
+                            <div class="card-body py-2">
+                                <div class="d-flex align-items-center">
+                                <!-- 過去は操作させない：チェック無し -->
+                                <span class="badge badge-secondary mr-2">過去</span>
+
+                                <div class="flex-grow-1">
+                                    <strong><%= r.PT_name %></strong> 様
+                                    （<%= r.PT_age %>歳）
+                                    ／ <%= r.Vac_name %>回目
+                                </div>
+
+                                <% if (r.state) { %>
+                                    <span class="badge badge-danger ml-2"><%- r.state %></span>
+                                <% } %>
+                                </div>
+                            </div>
+                            </div>
+
+                            <% pd = r.j_date; pz = r.PT_zone; %>
+                        <% }); %>
+                        </div>
+                    </details>
+                    <% } %>
 
                     <!-- 操作エリア（プランごと） -->
                     <div class="card mt-4">

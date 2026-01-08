@@ -15,7 +15,6 @@ var sql=require('../bin/sql.js');
 const mail = require('../bin/mail.js');
 const crypt = require('../bin/crypt.js');
 const ejs = require('ejs');
-const Mail = require('nodemailer/lib/mailer/index.js');
 
 sql.set_log(null,0,Env.title + ' System started on port ' + Env.port);
 // var errorlists = require('../bin/errors.json');
@@ -654,31 +653,33 @@ async function familyadd(req, res){
   }
 }
 
-async function reserve_new_select(req,res){
+// reserve_new_select : 予約する人の選択（年齢ルールを見て選択可否を付与）
+async function reserve_new_select(req, res) {
   let errors = [];
-  try{
+  try {
     const userdata = getUserinfos(req);
-    if(!userdata || !req.query.plan){
+    if (!userdata || !req.query.plan) {
       errors.push('最初のページから再度アクセスし直してください。');
-      error_render(req,res,'reserve_new_select',errors);
+      error_render(req, res, 'reserve_new_select', errors);
       return;
     }
 
-    const planid = parseInt(req.query.plan);
-    let families = [];
+    const planid = parseInt(req.query.plan, 10);
+    const fid = userdata.FID;
+
+    // プラン取得
     const plandata = await sql.getPlan(planid);
-   
-    if(plandata.break && plandata.detail){
+
+    // detail整形（既存踏襲）
+    if (plandata.break && plandata.detail) {
       plandata.detail = '<p>' + nl2br(plandata.detail) + '</p>';
     }
 
-    //Fullモードか
-    const stop = parseInt(plandata.full);
-    if(stop){
+    // Fullモード（既存踏襲）
+    const stop = parseInt(plandata.full, 10);
+    if (stop) {
       errors.push('予約は満員になりました。申し訳ございませんが、現在新規の予約はできません。');
-      //error_render(req,res,'reserve_new_select',errors);
-
-      res.render('reserve_new_select', { 
+      res.render('reserve_new_select', {
         Env: Env,
         errors: errors,
         plan: plandata
@@ -687,28 +688,102 @@ async function reserve_new_select(req,res){
     }
 
     // 家族情報取得
-    const fid = userdata.FID;
-    q = 'SELECT DISTINCT UID, name1, name2, birth, del  FROM '+ Db.T_users + ' WHERE ((del = 0) AND ( FID = ?)) ORDER BY birth';
-    let [rows, fields]= await sql.pool.query(q, [fid]);
-    families = rows;
+    const q = `
+      SELECT DISTINCT UID, name1, name2, birth, del
+      FROM ${Db.T_users}
+      WHERE ((del = 0) AND (FID = ?))
+      ORDER BY birth
+    `;
+    let [rows] = await sql.pool.query(q, [fid]);
+    let families = rows || [];
+
+    // ===== 年齢ルール（reserve_plan_rules）を読み込む =====
+    // rules: [{min_age_m,max_age_m,required_doses,note,...}, ...]
+    const rules = await sql.getPlanRules(planid);
+
+    // 月齢計算（満月齢）
+    function calcMonthsAge(birthDate, baseDate) {
+      const b = new Date(birthDate);
+      const d = new Date(baseDate);
+      let months = (d.getFullYear() - b.getFullYear()) * 12 + (d.getMonth() - b.getMonth());
+      if (d.getDate() < b.getDate()) months -= 1;
+      return months;
+    }
+
+    function matchRuleByMonths(rulesArr, monthsAge) {
+      return (rulesArr || []).find(r => {
+        const minM = Number(r.min_age_m);
+        const maxM = Number(r.max_age_m);
+        return monthsAge >= minM && monthsAge <= maxM;
+      }) || null;
+    }
+
+    // 接種日未確定なので、患者選択時は「下限だけ 12ヶ月（=1歳）ゆるめる」
+    const RELAX_MIN_M = 12;
+    const today = new Date();
 
     moment.locale('ja');
-    families.forEach(function(f,index){
-      families[index].birth = moment(f.birth).format('YYYY年M月D日');
-    })
-    
-    res.render('reserve_new_select', { 
+
+    families = families.map(f => {
+      const birth = f.birth;                  // DBのbirth（Date or string）
+      const age_m = calcMonthsAge(birth, today);
+
+      // 厳密一致（今日 ）
+      const strictRule = matchRuleByMonths(rules, age_m);
+
+      // ゆるめ一致：min_age_m のみ 12ヶ月緩和
+      const relaxedRule = (rules || []).find(r => {
+        const minM = Number(r.min_age_m) - RELAX_MIN_M;
+        const maxM = Number(r.max_age_m);
+        return age_m >= minM && age_m <= maxM;
+      }) || null;
+
+      // 付与情報
+      let eligible = true;
+      let age_note = '';
+      let required_doses = null; // 表示に使うなら
+
+      if (strictRule) {
+        eligible = true;
+        required_doses = strictRule.required_doses;
+        // note は表示したいなら使う（例：2-18歳、13歳未満など）
+        if (strictRule.note) age_note = `対象：${strictRule.note}`;
+      } else if (relaxedRule) {
+        // 日程次第で対象に入る可能性があるので、選択は許可して「要確認」表示
+        eligible = true;
+        required_doses = relaxedRule.required_doses;
+        age_note = '年齢要確認（接種日によって対象になります）';
+      } else {
+        // 明らかに対象外 → 選択不可
+        eligible = false;
+        age_note = '対象年齢外です';
+      }
+
+      return {
+        ...f,
+        birth_disp: moment(birth).format('YYYY年M月D日'),
+        age_m: age_m,
+        eligible: eligible,
+        age_note: age_note,
+        required_doses: required_doses
+      };
+    });
+
+    // 画面へ
+    res.render('reserve_new_select', {
       Env: Env,
       errors: errors,
       plan: plandata,
       family: families
     });
-  } catch(e){
-    console.log('Error in reserve_new_select');
+
+  } catch (e) {
+    console.log('Error in reserve_new_select', e);
     errors.push(e);
-    error_render(req,res,'reserve_new_select',errors);
+    error_render(req, res, 'reserve_new_select', errors);
   }
 }
+
 
 async function reserve_new_cal(req, res, edit = 0, reserved_ids = []) { //変更モードと新規モード兼用
   //変更モードで起動:edit=1
@@ -993,103 +1068,159 @@ async function reserve_new_cal(req, res, edit = 0, reserved_ids = []) { //変更
 }
 
 
-async function reserve_new_conf(req,res){
+async function reserve_new_conf(req, res) {
   let errors = [];
   let warnings = [];
 
-  try{
+  try {
     let userdata = getUserinfos(req);
-    if(check_args(req.query,['plan','ptuids','year','month','day']).length > 0 || !userdata){
+    if (check_args(req.query, ['plan', 'ptuids', 'year', 'month', 'day']).length > 0 || !userdata) {
       errors.push('不正なアクセスです。もう一度トップページから操作し直してみてください。');
-      error_render(req,res,'reserve_new_conf',errors);
+      error_render(req, res, 'reserve_new_conf', errors);
       return;
     }
-    const planid = parseInt(req.query.plan);
-    
-    const plandatapromise =  sql.getPlan(planid);
-    const zonespromise =  sql.getZones(planid);
+
+    const planid = parseInt(req.query.plan, 10);
+
+    const plandatapromise = sql.getPlan(planid);
+    const zonespromise = sql.getZones(planid);
+    const rulespromise = sql.getPlanRules(planid); // ★追加：年齢ルール
     const plandata = await plandatapromise;
     const zones = await zonespromise;
+    const rules = await rulespromise;
 
-    //予約情報設定
+    // 予約情報設定
     moment.locale('ja');
-    const rdate = moment([parseInt(req.query.year),parseInt(req.query.month)-1,parseInt(req.query.day)]);
+    const rdate = moment([parseInt(req.query.year, 10), parseInt(req.query.month, 10) - 1, parseInt(req.query.day, 10)]);
     let resdata = {
       plan: planid,
-      year  : rdate.year(),
-      month : rdate.month()+1,
-      day   : rdate.date(),
-      zoneid: parseInt(req.query.zoneid),
-      zonename: zones.find((z)=> z.id === parseInt(req.query.zoneid)).name,
-      num   : parseInt(req.query.num),
-      youbi : rdate.format('dddd')
+      year: rdate.year(),
+      month: rdate.month() + 1,
+      day: rdate.date(),
+      zoneid: parseInt(req.query.zoneid, 10),
+      zonename: zones.find((z) => z.id === parseInt(req.query.zoneid, 10)).name,
+      num: parseInt(req.query.num, 10),
+      youbi: rdate.format('dddd')
     };
 
+    // ===== ユーティリティ：月齢計算（満月齢）=====
+    function calcMonthsAge(birthDate, baseMoment) {
+      const b = moment(birthDate);
+      if (!b.isValid()) return null;
+      // “月差”から日付ぶん調整（誕生日当月に到達してないなら -1）
+      let months = baseMoment.diff(b, 'months');
+      // momentのdiff('months')は多くの場合これでOKだが、フォーマット揺れ対策で明示的に
+      // （必要ならここを厳密化可能）
+      return months;
+    }
+
+    function matchRuleByMonths(rulesArr, monthsAge) {
+      if (!Array.isArray(rulesArr) || rulesArr.length === 0) return null;
+      return rulesArr.find(r => monthsAge >= Number(r.min_age_m) && monthsAge <= Number(r.max_age_m)) || null;
+    }
+
     // 家族情報取得
-    const ptuids = req.query.ptuids;
+    const ptuids = Array.isArray(req.query.ptuids) ? req.query.ptuids : [req.query.ptuids];
     let families = [];
 
-    for(let ptuid of ptuids){
+    for (let ptuid of ptuids) {
       let ptdata = await sql.uid2ptinfo(ptuid);
       families.push(ptdata);
-      //重複の確認
-      let recentreserve = await sql.getRecentReserve(ptuid,rdate.format('YYYY-MM-DD'),planid,0,plandata.intweek);
-      if(recentreserve.length > 0){
-        recentreserve.forEach(function(r){
-          errors.push(r.PT_name + '様、接種間隔があいていません。' + r.PT_date + 'の予約から' + plandata.intweek + '週間以上あけてください。');
-        }) ;
+
+      // 重複の確認（既存）
+      let recentreserve = await sql.getRecentReserve(
+        ptuid,
+        rdate.format('YYYY-MM-DD'),
+        planid,
+        0,
+        plandata.intweek
+      );
+      if (recentreserve.length > 0) {
+        recentreserve.forEach(function (r) {
+          errors.push(
+            r.PT_name + '様、接種間隔があいていません。' +
+            r.PT_date + 'の予約から' + plandata.intweek + '週間以上あけてください。'
+          );
+        });
       }
-      // --- ②推奨回数チェック（警告：confirm用） ---
-      // ptdata に生年月日が入っている想定（例: ptdata.birthday / ptdata.birth など）
-      const birth = ptdata.birth; 
-      if (birth) {
-        let b = null;
-        if (birth instanceof Date) {
-          b = moment(birth);   // ← これが一番安全
-        } else if (typeof birth === 'string') {
-          b = moment(birth, ['YYYY-MM-DD','YYYY/MM/DD','YYYYMMDD'], true);
-        }
-        if (b && b.isValid()) {
-          const ageMonths = rdate.diff(b, 'months'); // 予約日時点の月齢
-          const recDoses = await sql.getRecommendedDosesByAge(planid, ageMonths);
 
-          if (recDoses !== null) {
-            const currentCount = await more2_check(ptuid, planid);
-            const afterCount = currentCount + 1; // 今回を含めた回数
+      // ===== ①対象年齢チェック（厳密：接種日で判定）=====
+      // ptdata.birth が Date or string 想定
+      const birthRaw = ptdata.birth;
+      let birthMoment = null;
 
-            if (afterCount > recDoses) {
-              warnings.push(
-                `${ptdata.name1}${ptdata.name2}様（予約日時点 ${formatAgeYM(ageMonths)}）は推奨接種回数が${recDoses}回ですが、今回で${afterCount}回目の予約になります。`
-              );
+      if (birthRaw instanceof Date) {
+        birthMoment = moment(birthRaw);
+      } else if (typeof birthRaw === 'string') {
+        birthMoment = moment(birthRaw, ['YYYY-MM-DD', 'YYYY/MM/DD', 'YYYY年M月D日', 'YYYYMMDD'], true);
+        if (!birthMoment.isValid()) birthMoment = moment(birthRaw); // 最後の保険
+      } else {
+        birthMoment = moment(birthRaw); // null等でも受ける
+      }
+
+      if (!birthMoment || !birthMoment.isValid()) {
+        // 生年月日が取れないのは本来おかしいので、確定不可にするのが安全
+        errors.push(`${ptdata.name1}${ptdata.name2}様：生年月日を取得できませんでした。受付にご連絡ください。`);
+      } else {
+        const ageMonths = calcMonthsAge(birthMoment, rdate);
+        if (ageMonths === null || !Number.isFinite(ageMonths)) {
+          errors.push(`${ptdata.name1}${ptdata.name2}様：年齢計算に失敗しました。受付にご連絡ください。`);
+        } else {
+          const rule = matchRuleByMonths(rules, ageMonths);
+
+          if (!rule) {
+            // 対象外 → エラー（確定不可）
+            errors.push(
+              `${ptdata.name1}${ptdata.name2}様（予約日時点 ${formatAgeYM(ageMonths)}）は、対象年齢外のため予約できません。`
+            );
+          } else {
+            // 対象内 → 参考情報として warnings に入れても良い（任意）
+            // 例：13歳未満/以上のルール表示
+            if (rule.note) {
+              // 表示が邪魔なら消してOK
+              // warnings.push(`${ptdata.name1}${ptdata.name2}様は「${rule.note}」の区分です。`);
             }
+          }
+        }
+      }
+
+      // ===== ②推奨回数チェック（警告：confirm用）=====
+      // ここはあなたの既存ロジックを活かす（接種日で月齢を取ると一貫する）
+      if (birthMoment && birthMoment.isValid()) {
+        const ageMonthsAtShot = rdate.diff(birthMoment, 'months'); // 予約日時点の月齢
+        const recDoses = await sql.getRecommendedDosesByAge(planid, ageMonthsAtShot);
+
+        if (recDoses !== null) {
+          const currentCount = await more2_check(ptuid, planid);
+          const afterCount = currentCount + 1; // 今回を含めた回数
+
+          if (afterCount > recDoses) {
+            warnings.push(
+              `${ptdata.name1}${ptdata.name2}様（予約日時点 ${formatAgeYM(ageMonthsAtShot)}）は推奨接種回数が${recDoses}回ですが、今回で${afterCount}回目の予約になります。`
+            );
           }
         }
       }
     }
 
-    if(errors.length > 0){
-      error_render(req,res, '予約確認',errors);
+    if (errors.length > 0) {
+      error_render(req, res, '予約確認', errors);
       return;
     }
 
-    //予約実行OKのTokenを発行する
+    // 予約実行OKのTokenを発行する
     moment.locale('en');
     const token = crypt.hashing(`${userdata.UID}:${moment().valueOf()}:${Math.random()}`);
 
-    //予約データの暗号化
-    const resobj = {resdata: resdata, ptuids:ptuids};
+    // 予約データの暗号化
+    const resobj = { resdata: resdata, ptuids: ptuids };
     const enc_data = crypt.getEncryptedString(JSON.stringify(resobj));
 
-    //tokenの保存
+    // tokenの保存
     const q = 'UPDATE ' + Db.T_users + ' SET hash = ?, hashAt = cast( now() as datetime ) WHERE UID = ?';
-    //const q = 'UPDATE ' + Db.T_users + ' SET hash = ? , hashAt = ? WHERE UID=  ?' ;
-    // userdata.hash = token;
-    // userdata.hashAt = moment().format();
-    const [updateresult] = await sql.pool.query(q,[token, userdata.UID]);
-    //USERINFOSの更新
-    // res.cookie('USERINFOS',crypt.getEncryptedString(JSON.stringify(userdata)));
+    await sql.pool.query(q, [token, userdata.UID]);
 
-    res.render('reserve_new_conf', { 
+    res.render('reserve_new_conf', {
       Env: Env,
       errors: errors,
       warnings: warnings,
@@ -1099,13 +1230,13 @@ async function reserve_new_conf(req,res){
       ptuids: ptuids,
       token: token,
       data: enc_data,
-      form:  req.query
+      form: req.query
     });
-    
-  } catch(e) {
+
+  } catch (e) {
     errors.push(e);
-    error_render(req,res,'reserve_new_conf',errors);
-  } 
+    error_render(req, res, 'reserve_new_conf', errors);
+  }
 }
 
 function formatAgeYM(ageMonths) {
@@ -1333,6 +1464,7 @@ async function reserve_new_complete(req, res) {
         const planName = plandata?.name || plandata?.planname || plandata?.title || '';
         const subject = planName ? `予約完了（${planName}）` : '予約完了';
 
+        console.log(Mail);
         ejs.renderFile('./views/mailtemp_edit.ejs', {
           Mail: Mail,
           ptname: (userdata.name1 || userdb.name1 || '') + (userdata.name2 || userdb.name2 || ''),
@@ -1475,6 +1607,7 @@ async function reserve_edit_complete(req, res) {
         const subject = planName ? `予約日変更完了（${planName}）` : '予約日変更完了';
 
         ejs.renderFile('./views/mailtemp_edit.ejs', {
+          Mail: Mail,
           ptname: (userdata.name1 || userdb.name1 || '') + (userdata.name2 || userdb.name2 || ''),
           plandata: plandata,
           res: resinfos,
@@ -1519,7 +1652,8 @@ async function reserve_change(req,res){
     // plan指定なら従来通り / 無ければ全予約
     const planid = (req.query.plan !== undefined) ? req.query.plan : null;
     
-    const resdata = await sql.getReservesFromFid(fid,planid); 
+    const showPast = (req.query.showpast === '1');
+    const resdata = await sql.getReservesFromFid(fid,planid, showPast); 
 
     res.render('reserve_change', { 
       Env: Env,
@@ -1668,6 +1802,7 @@ async function reserve_del_complete(req, res) {
         }
 
         ejs.renderFile('./views/mailtemp_delete.ejs', {
+          Mail: Mail,
           ptname: userdata.name1 + userdata.name2,
           reslists: reslists,
           res: resinfos
@@ -1870,6 +2005,7 @@ async function mail_auth(req,res){
         sql.set_log(req,userdata.SID,'Registered Email');
         //完了メール送信
         ejs.renderFile('./views/mailtemp_registaddress.ejs', {
+          Mail: Mail,
           ptname: userdata.name1 + userdata.name2,
           Env: Env
         },function(err,data){

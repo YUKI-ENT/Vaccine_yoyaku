@@ -462,7 +462,7 @@ async function getReservesFromUid(ptuid, planid){ //UID -> 予約一覧
   }
 }
 
-async function getReservesFromFid(fid, planid = null) {
+async function getReservesFromFid(fid, planid = null, showPast = false) {
   try {
     let q = `
       SELECT r.*,
@@ -474,9 +474,13 @@ async function getReservesFromFid(fid, planid = null) {
       INNER JOIN ${Db.T_plans} p ON r.plan = p.id
       WHERE r.FID = ?
         AND r.Del = 0
-        AND r.PT_date >= CURDATE()
     `;
     const params = [fid];
+
+    // ★従来は未来のみ。showPast=true のときだけ条件を外す
+    if (!showPast) {
+      q += ` AND r.PT_date >= CURDATE()`;
+    }
 
     if (planid !== null && planid !== undefined && planid !== '') {
       q += ` AND r.plan = ?`;
@@ -490,17 +494,28 @@ async function getReservesFromFid(fid, planid = null) {
     moment.locale('ja');
     const now = moment();
 
-    // state / j_date 付与（挙動そのまま）
+    // ★N+1（予約件数分getPlan）を避ける：planごとにキャッシュ
+    const planCache = new Map();
+
     for (const r of resdata) {
       const pt = moment(r.PT_date);
+
+      // plan_id の取り方が r.plan_id / r.plan の混在に備える
+      const pid = r.plan_id ?? r.plan;
 
       if (pt.isBefore(now)) {
         r.state = '接種済';
       } else {
-        // cancelは planごとに違うので、plan_idから取る（キャッシュ推奨）
-        // まず簡単に：必要時に getPlan を呼ぶ（後でMapキャッシュにすると速い）
-        const plandata = await getPlan(r.plan_id);
-        if (pt.isBefore(moment().add(parseInt(plandata.cancel), 'hours'))) {
+        let plandata = planCache.get(pid);
+        if (!plandata) {
+          plandata = await getPlan(pid);
+          planCache.set(pid, plandata);
+        }
+
+        const cancelHours = parseInt(plandata.cancel, 10);
+        const cancelLimit = moment().add(Number.isFinite(cancelHours) ? cancelHours : 0, 'hours');
+
+        if (pt.isBefore(cancelLimit)) {
           r.state = '変更不可です。<br>予約を変更される場合は、お手数ですが直接病院までご連絡下さい';
         } else {
           r.state = '';
@@ -516,6 +531,7 @@ async function getReservesFromFid(fid, planid = null) {
     return null;
   }
 }
+
 
 
 async function getVaccineList(planid){  //planのワクチンリスト[]
@@ -768,7 +784,6 @@ async function setSettings(item, val){
   }
 }
 
-
 function calcAge(birthdate, targetdate) { // moment型
 	var age = targetdate.year() - birthdate.year();
 	var birthday = moment([targetdate.year(), birthdate.month(), birthdate.date()]);
@@ -790,15 +805,21 @@ function formatDate(date, format) {// yyyy-M-d H:m:s.S
 };
 
 async function getPlanRules(planId) {
-  const q = `
-    SELECT id, min_age_m, max_age_m, required_doses, sort, note
-    FROM reserve_plan_rules
-    WHERE plan_id = ?
-    ORDER BY sort ASC
-  `;
-  const [rows] = await pool.query(q, [planId]);
-  return rows;
+  try {
+    const q = `
+      SELECT id, plan_id, min_age_m, max_age_m, required_doses, sort, note
+      FROM reserve_plan_rules
+      WHERE plan_id = ?
+      ORDER BY sort ASC, id ASC
+    `;
+    const [rows] = await pool.query(q, [Number(planId)]);
+    return rows || [];
+  } catch (e) {
+    console.log('Error in getPlanRules:', e);
+    return [];
+  }
 }
+
 
 async function replacePlanRules(planId, rules) {
   const conn = await pool.getConnection();

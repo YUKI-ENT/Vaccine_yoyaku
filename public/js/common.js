@@ -69,3 +69,9 @@ $(document).on('submit', '#reserveConfirmForm', function (e) {
     }
     return true;
 });
+
+// reserve_change: 過去予約表示トグル（CSP対策：inline eventを使わない）
+$(document).on('change', '#showpast', function () {
+    const $form = $('#showpastForm');
+    if ($form.length) $form.trigger('submit'); // もしくは $form[0].submit()
+});
