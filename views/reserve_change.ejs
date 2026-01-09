@@ -62,13 +62,9 @@
             }, 0);
         %>
 
-        <% if ((res || []).length === 0 || totalFuture === 0) { %>
+        <% if ((res || []).length === 0 ) { %>
             <div class="alert alert-info">
-                <% if ((res || []).length === 0) { %>
                 現在、有効な予約はありません。
-                <% } else { %>
-                予約はありません。<% if (!showPast) { %>（必要なら「過去の予約も表示」をONにしてください）<% } %>
-                <% } %>
             </div>
         <% } else { %>
             <% planIds.forEach(function(pid){ 
